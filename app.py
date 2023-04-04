@@ -9,9 +9,9 @@ from maps import cat_options, axis_options, seasons, comps, positions, not_per_m
 from pandas import read_sql
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, cast
-# from dotenv import load_dotenv
-#
-# load_dotenv()
+from dotenv import load_dotenv
+
+load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -122,61 +122,6 @@ app.layout = Col([
 
 
 @app.callback(
-    Output('x', 'options'),
-    Input('xcat', 'value'),
-    prevent_initial_call=True
-)
-def update_x_dropdown(value):
-    return [{"label": key, "value": value} for key, value in axis_options[value].items()]
-
-
-@app.callback(
-    Output('x', 'value'),
-    Input('x', 'options'),
-    prevent_initial_call=True
-)
-def update_x_value(options):
-    return options[0]['value']
-
-
-@app.callback(
-    Output('y', 'options'),
-    Input('ycat', 'value'),
-    prevent_initial_call=True
-)
-def update_y_dropdown(value):
-    return [{"label": key, "value": value} for key, value in axis_options[value].items()]
-
-
-@app.callback(
-    Output('y', 'value'),
-    Input('y', 'options'),
-    prevent_initial_call=True
-)
-def update_y_value(options):
-    return options[0]['value']
-
-
-@app.callback(
-    Output('z', 'options'),
-    Input('zcat', 'value'),
-    prevent_initial_call=True
-)
-def update_z_dropdown(value):
-    return [{"label": key, "value": value} for key, value in axis_options[value].items()]
-
-
-@app.callback(
-    Output('z', 'value'),
-    Input('z', 'options'),
-    prevent_initial_call=True
-
-)
-def update_z_value(options):
-    return options[0]['value']
-
-
-@app.callback(
     output=Output('main-plot', 'figure'),
     inputs=[
         (
@@ -208,6 +153,7 @@ def update_z_value(options):
     prevent_initial_call=True
 )
 def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, colour, dim, per_min):
+    print('update')
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     query = make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, per_min)
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
@@ -362,6 +308,60 @@ def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons,
         mins.c["mins"].between(minutes[0], minutes[1])
     )
     return query
+
+
+@app.callback(
+    Output('x', 'options'),
+    Input('xcat', 'value'),
+    prevent_initial_call=True
+)
+def update_x_dropdown(value):
+    return [{"label": key, "value": value} for key, value in axis_options[value].items()]
+
+
+@app.callback(
+    Output('x', 'value'),
+    Input('x', 'options'),
+    prevent_initial_call=True
+)
+def update_x_value(options):
+    return options[0]['value']
+
+
+@app.callback(
+    Output('y', 'options'),
+    Input('ycat', 'value'),
+    prevent_initial_call=True
+)
+def update_y_dropdown(value):
+    return [{"label": key, "value": value} for key, value in axis_options[value].items()]
+
+
+@app.callback(
+    Output('y', 'value'),
+    Input('y', 'options'),
+    prevent_initial_call=True
+)
+def update_y_value(options):
+    return options[0]['value']
+
+
+@app.callback(
+    Output('z', 'options'),
+    Input('zcat', 'value'),
+    prevent_initial_call=True
+)
+def update_z_dropdown(value):
+    return [{"label": key, "value": value} for key, value in axis_options[value].items()]
+
+
+@app.callback(
+    Output('z', 'value'),
+    Input('z', 'options'),
+    prevent_initial_call=True
+)
+def update_z_value(options):
+    return options[0]['value']
 
 
 if __name__ == '__main__':
