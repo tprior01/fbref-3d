@@ -122,13 +122,13 @@ axis_options = {
             'Progressive Pass Distance': 'prog_pass_dist',
             'Completed Short Passes': 'cmp_pass_short',
             'Attempted Short Passes': 'att_pass_short',
-            'Short Pass Completion': 'pass_completion_short',
+            'Short Pass Completion (%)': 'pass_completion_short',
             'Completed Medium Passes': 'cmp_pass_medium',
             'Attempted Medium Passes': 'att_pass_medium',
-            'Medium Pass Completion': 'medium_completion_short',
+            'Medium Pass Completion (%)': 'medium_completion_short',
             'Completed Long Passes': 'cmp_pass_long',
             'Attempted Long Passes': 'att_pass_long',
-            'Long Pass Completion': 'long_completion_short',
+            'Long Pass Completion (%)': 'long_completion_short',
             'Assists': 'assist',
             'xAG': 'xag',
             'xA': 'xa',
@@ -155,13 +155,46 @@ axis_options = {
             'Offside Passes': 'offside_pass',
             'Blocked Passes': 'blocked_pass'
         },
-    "Shot Creation":
+    "gca":
         {
-
+            'Shot Creation': 'sca',
+            'Shot Creation (Live Pass)': 'sca_pass_live',
+            'Shot Creation (Dead Pass)': 'sca_pass_dead',
+            'Shot Creation (Take-On)': 'sca_take_on',
+            'Shot Creation (Shot)': 'sca_shot',
+            'Shot Creation (Fouled)': 'sca_fouled',
+            'Shot Creation (Defending)': 'sca_def',
+            'Goal Creation': 'sca',
+            'Goal Creation (Live Pass)': 'gca_pass_live',
+            'Goal Creation (Dead Pass)': 'gca_pass_dead',
+            'Goal Creation (Take-On)': 'gca_take_on',
+            'Goal Creation (Shot)': 'gca_shot',
+            'Goal Creation (Fouled)': 'gca_fouled',
+            'Goal Creation (Defending)': 'gca_def',
         },
     "Possession":
         {
-
+            'Touches': 'touch',
+            'Def Pen Area Touches': 'touch_def_pen',
+            'Def 3rd Touches': 'touch_def',
+            'Mid 3rd Touches': 'touch_mid',
+            'Att 3rd Touches': 'touch_att',
+            'Att Pen Area Touches': 'touch_att_pen',
+            'Live Ball Touches': 'touch_live',
+            'Attempted Take-Ons': 'att_take_on',
+            'Completed Take-Ons': 'cmp_take_on',
+            'Take-On Success (%)': 'take_on_success',
+            'Unsuccessful Take-Ons': 'uns_take_on',
+            'Carries': 'carry',
+            'Carry Distance': 'carry_dist',
+            'Progressive Carry Distance': 'carry_prog_dist',
+            'Progressive Carries': 'carry_prog',
+            'Carries to Att 3rd': 'carry_att_third',
+            'Carries to Att Pen Area': 'carry_opp_pen',
+            'Mis-controls': 'miscontrol',
+            'Dispossessed': 'disposs',
+            'Passes Received': 'received',
+            'Progressive Passes Received': 'prog_received'
         },
     "Defense":
         {
