@@ -19,6 +19,7 @@ metadata = MetaData()
 metadata.reflect(engine, only=cat_options.values())
 
 app = Dash(external_stylesheets=[themes.BOOTSTRAP])
+server = app.server
 
 with engine.connect() as conn:
     max_mins = conn.execute(
