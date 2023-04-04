@@ -52,7 +52,7 @@ app.layout = Col([
             Col([
                 Row([
                     drop_down("zcat", cat_options, "passing"),
-                    drop_down("z", axis_options["passing"], "prog_pass")
+                    drop_down("z", axis_options["passing"], None)
                 ])
             ])
         ]),
@@ -150,7 +150,6 @@ app.layout = Col([
     prevent_initial_call=True
 )
 def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, colour, dim, per_min):
-    print('update')
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     query = make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, per_min)
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
@@ -354,8 +353,7 @@ def update_z_dropdown(value):
 
 @app.callback(
     Output('z', 'value'),
-    Input('z', 'options'),
-    prevent_initial_call=True
+    Input('z', 'options')
 )
 def update_z_value(options):
     return options[0]['value']
