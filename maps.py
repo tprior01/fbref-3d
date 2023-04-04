@@ -95,7 +95,7 @@ aggregates = {
     "launch_perc": ["att_launch_non_goal_kick", "att_pass_non_goal_kick", 100, Numeric(4, 1)]
 }
 
-sub_options = {
+axis_options = {
     "shooting":
         {
             "Goals": "goals",
@@ -139,9 +139,21 @@ sub_options = {
             'Accurate Crosses': 'acc_cross',
             'Progressive Passes': 'prog_pass'
         },
-    "Pass Types":
+    "passing_types":
         {
-
+            'Live Passes': 'live_pass',
+            'Dead Passes': 'dead_pass',
+            'Free Kick Passes': 'fk_pass',
+            'Completed Through Balls': 'tb_pass',
+            'Switch Pass': 'sw_pass',
+            'Crosses': 'cross_pass',
+            'Throw Ins': 'throw_in',
+            'Corner Kicks': 'ck',
+            'Inswinging Corner Kicks': 'ck_in',
+            'Outswinging Corner Kicks': 'ck_out',
+            'Straight Corner Kicks': 'ck_straight',
+            'Offside Passes': 'offside_pass',
+            'Blocked Passes': 'blocked_pass'
         },
     "Shot Creation":
         {
