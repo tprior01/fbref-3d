@@ -5,19 +5,18 @@ from dash import dcc
 from dash import html
 from dash.dependencies import Input, Output, State
 from plotly.express import scatter_3d, scatter
-from maps import cat_options, sub_options, seasons, comps, positions, not_per_min, aggregates
+from maps import cat_options, axis_options, seasons, comps, positions, not_per_min, aggregates
 from pandas import read_sql
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, cast
-# from dotenv import load_dotenv
+from dotenv import load_dotenv
 
-# load_dotenv()
+load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
 metadata = MetaData()
-metadata.reflect(engine, only= ['player', 'keepers', 'keepersadv', 'shooting', 'passing', 'passing_types', 'gca', 'defense', 'possession', 'playingtime', 'misc'])
-
+metadata.reflect(engine, only=cat_options.values())
 
 app = Dash(external_stylesheets=[themes.BOOTSTRAP])
 
@@ -43,19 +42,19 @@ app.layout = Col([
             Col([
                 Row([
                     drop_down("xcat", cat_options, "shooting"),
-                    drop_down("x", sub_options["shooting"], "xg")
+                    drop_down("x", axis_options["shooting"], "xg")
                 ])
             ]),
             Col([
                 Row([
                     drop_down("ycat", cat_options, "passing"),
-                    drop_down("y", sub_options["passing"], "xa")
+                    drop_down("y", axis_options["passing"], "xa")
                 ])
             ]),
             Col([
                 Row([
                     drop_down("zcat", cat_options, "passing"),
-                    drop_down("z", sub_options["passing"], "prog_pass")
+                    drop_down("z", axis_options["passing"], "prog_pass")
                 ])
             ])
         ]),
@@ -91,13 +90,13 @@ app.layout = Col([
 
     Card([
         Row([
-            Col(html.Label('ages')),
-            Col(html.Label('values')),
+            Col(html.Label('age')),
+            Col(html.Label('value (€)')),
             Col(html.Label('minutes'))
         ]),
         Row([
-            Col([Row([range_slider("age", 15, max_age, 15, max_age, 1)])]),
-            Col([Row([range_slider("value (€)", 0, max_value, 0, max_value, 1)])]),
+            Col([Row([range_slider("ages", 15, max_age, 15, max_age, 1)])]),
+            Col([Row([range_slider("values", 0, max_value, 0, max_value, 1)])]),
             Col([Row([range_slider("minutes", 0, max_mins, 1250, max_mins, 100)])])
         ]),
     ], style={"width": "100%"}, body=True),
@@ -127,7 +126,7 @@ app.layout = Col([
     prevent_initial_call=True
 )
 def update_x_dropdown(value):
-    return [{"label": key, "value": value} for key, value in sub_options[value].items()]
+    return [{"label": key, "value": value} for key, value in axis_options[value].items()]
 
 
 @app.callback(
@@ -145,7 +144,7 @@ def update_x_value(options):
     prevent_initial_call=True
 )
 def update_y_dropdown(value):
-    return [{"label": key, "value": value} for key, value in sub_options[value].items()]
+    return [{"label": key, "value": value} for key, value in axis_options[value].items()]
 
 
 @app.callback(
@@ -163,7 +162,7 @@ def update_y_value(options):
     prevent_initial_call=True
 )
 def update_z_dropdown(value):
-    return [{"label": key, "value": value} for key, value in sub_options[value].items()]
+    return [{"label": key, "value": value} for key, value in axis_options[value].items()]
 
 
 @app.callback(
@@ -195,8 +194,8 @@ def update_z_value(options):
         ),
         Input('club', 'value'),
         Input('nation', 'value'),
-        Input('age', 'value'),
-        Input('value (€)', 'value'),
+        Input('ages', 'value'),
+        Input('values', 'value'),
         Input('minutes', 'value'),
         Input('seasons', 'value'),
         Input('competitions', 'value'),
@@ -215,22 +214,30 @@ def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, com
     z_label = [x['label'] for x in xyz[5] if x['value'] == xyz[2]][0]
     with engine.connect() as conn:
         graph_params = dict(
-            data_frame=read_sql(query, con=conn).round({'x': 3, 'y': 3, 'z': 3}),
+            data_frame=read_sql(query, con=conn).round({'x': 3, 'y': 3, 'z': 3}).fillna(0),
             x='x',
             y='y',
             color=colour,
             hover_data=[
-                'name', 'name',
-                'nationality', 'nationality',
+                'name',
+                'nationality',
+                'position',
+                'current_value',
+                'age',
+                'club'
             ],
             labels={
                 "x": f"({x_label}) / 90" if per_min[0] else x_label,
                 "y": f"({y_label}) / 90" if per_min[1] else y_label,
                 "z": f"({z_label}) / 90" if per_min[2] else z_label,
-                "name": "name",
-                'nation': "nationality",
-                'position': "position"
-            },
+                "name": "Name",
+                'nationality': "Nation",
+                'position': "Position",
+                'current_value': "Value",
+                'age': "Age",
+                'club': "Team"
+
+        },
         )
     if dim:
         plot = scatter_3d
@@ -250,7 +257,9 @@ def fig_updates(fig):
         margin=dict(t=0, b=0, l=0, r=0),
         template="plotly_white",
     )
-    fig.update_traces(marker_size=5)
+    fig.update_traces(
+        marker_size=5,
+    )
     fig.update_scenes(
         aspectratio=dict(x=1, y=1, z=1),
         aspectmode="auto"
@@ -345,7 +354,8 @@ def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons,
         isouter=True
     ).join(
         mins,
-        mins.c["id"] == player.c["id"]
+        mins.c["id"] == player.c["id"],
+        isouter=True
     ).where(
         player.c["age"].between(ages[0], ages[1]),
         mins.c["mins"].between(minutes[0], minutes[1])
