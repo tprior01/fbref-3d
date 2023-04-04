@@ -81,9 +81,9 @@ aggregates = {
     "pass_completion": ["cmp_pass", "att_pass", 100, Numeric(4, 1)],
     "pass_completion_short": ["cmp_pass_short", "att_pass_short", 100, Numeric(4, 1)],
     "pass_completion_medium": ["cmp_pass_medium", "att_pass_medium", 100, Numeric(4, 1)],
-    "pass_completion_long": ["cmp_pass_long", "att_pass_long"],
-    "dribbler_tackle_perc": ["cmp_drib_tackle", "att_drib_tackle"],
-    "take_on_success": ["cmp_take_on", "att_take_on"],
+    "pass_completion_long": ["cmp_pass_long", "att_pass_long", 100, Numeric(4, 1)],
+    "dribbler_tackle_perc": ["cmp_drib_tackle", "att_drib_tackle", 100, Numeric(4, 1)],
+    "take_on_success": ["cmp_take_on", "att_take_on", 100, Numeric(4, 1)],
     "avg_gk_pass_len": ["gk_pass_len", "att_gk_pass", 1, Numeric(3, 1)],
     "avg_goal_kick_len": ["goal_kick_len", "att_goal_kick", 1, Numeric(3, 1)],
     "avg_def_outside_pen_dist": ["def_outside_pen_dist", "def_outside_pen", 1, Numeric(3, 1)],
@@ -115,7 +115,29 @@ sub_options = {
         },
     "passing":
         {
-            'test'
+            'Completed Passes': 'cmp_pass',
+            'Attempted Passes': 'att_pass',
+            'Pass Completion': 'pass_completion',
+            'Total Pass Distance': 'tot_pass_dist',
+            'Progressive Pass Distance': 'prog_pass_dist',
+            'Completed Short Passes': 'cmp_pass_short',
+            'Attempted Short Passes': 'att_pass_short',
+            'Short Pass Completion': 'pass_completion_short',
+            'Completed Medium Passes': 'cmp_pass_medium',
+            'Attempted Medium Passes': 'att_pass_medium',
+            'Medium Pass Completion': 'medium_completion_short',
+            'Completed Long Passes': 'cmp_pass_long',
+            'Attempted Long Passes': 'att_pass_long',
+            'Long Pass Completion': 'long_completion_short',
+            'Assists': 'assist',
+            'xAG': 'xag',
+            'xA': 'xa',
+            'Assists - xAG': 'assists_minus_xag',
+            'Key Passes': 'key_pass',
+            'Passes to Final Third': 'fin_3rd_pass',
+            'Passes to Penalty Area': 'opp_pen_pass',
+            'Accurate Crosses': 'acc_cross',
+            'Progressive Passes': 'prog_pass'
         },
     "Pass Types":
         {
