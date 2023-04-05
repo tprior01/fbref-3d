@@ -1,5 +1,4 @@
 from dash import dcc
-from dash import html
 
 
 def drop_down(id, options, value):
