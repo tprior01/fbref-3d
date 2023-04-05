@@ -173,7 +173,7 @@ axis_options = {
             'Goal Creation (Fouled)': 'gca_fouled',
             'Goal Creation (Defending)': 'gca_def',
         },
-    "Possession":
+    "possession":
         {
             'Touches': 'touch',
             'Def Pen Area Touches': 'touch_def_pen',
@@ -216,7 +216,7 @@ axis_options = {
             'Clearances': 'clearance',
             'Errors Leading to Shot': 'error'
         },
-    "Miscellaneous":
+    "misc":
         {
             'Yellow Cards': 'y_card',
             'Red Cards': 'r_card',
