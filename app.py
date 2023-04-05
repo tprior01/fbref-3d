@@ -22,8 +22,7 @@ with engine.connect() as conn:
     max_mins = conn.execute(
         text("""select max(sum) from (select id, sum(minutes) from playingtime group by (id)) as x""")).scalar()
     max_value, max_age = conn.execute(
-        text("""select ceiling(max(current_value))::Integer, 
-        max(date_part('year', age(dob)))::Integer from player""")).all()[0]
+        text("""select ceiling(max(current_value))::Integer, max(date_part('year', age(dob)))::Integer from player""")).all()[0]
     clubs = conn.execute(
         text("""select distinct club from player where current_value > 20.0 order by club""")).scalars().all()
     nations = conn.execute(
@@ -32,11 +31,10 @@ with engine.connect() as conn:
 
 app.layout = Col([
     dcc.Markdown('''
-    
         # FBREF-3D
     
-        Welcome to FBRef-3d, a dashboard to visualise the data on fbref.com as 2D or 3D scatter graphs. The data is 
-        periodically scraped, rationalised and added to a PostgreSQL database. 
+        A dashboard to visualise the data on fbref.com as 2D or 3D scatter graphs. The data is 
+        periodically scraped and added to a PostgreSQL database. 
     '''),
     Card([
         Row([
