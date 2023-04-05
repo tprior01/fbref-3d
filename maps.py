@@ -71,6 +71,7 @@ not_per_min = {
     "avg_shot_dist",
 }
 
+# the array signifies a numerator, denominator, factor and output data type
 aggregates = {
     "save_perc": ["saves", "sot_ag", 100, Numeric(4, 1)],
     "clean_sheet_perc": ["saves", "sot_ag", 100, Numeric(4, 1)],
@@ -196,24 +197,104 @@ axis_options = {
             'Passes Received': 'received',
             'Progressive Passes Received': 'prog_received'
         },
-    "Defense":
+    "defense":
         {
-
+            'Attempted Tackles': 'att_tackle',
+            'Completed Tackles': 'cmp_tackle',
+            'Attempted Tackles (Def 3rd)': 'att_tackle_def',
+            'Attempted Tackles (Mid 3rd)': 'att_tackle_mid',
+            'Attempted Tackles (Att 3rd)': 'att_tackle_att',
+            'Attempted Dribbler Tackles': 'att_drib_tackle',
+            'Completed Dribbler Tackles': 'cmp_drib_tackle',
+            'Dribbler Tackle Success (%)': 'dribbler_tackle_perc',
+            'Unsuccessful Dribbler Tackles': 'uns_drib_tackle',
+            'Blocks': 'block',
+            'Blocked Shots': 'block_shot',
+            'Blocked Passes': 'block_pass',
+            'Interceptions': 'intercept',
+            'Tackles + Interceptions': 'tackle_plus_intercept',
+            'Clearances': 'clearance',
+            'Errors Leading to Shot': 'error'
         },
     "Miscellaneous":
         {
-
+            'Yellow Cards': 'y_card',
+            'Red Cards': 'r_card',
+            'Two Yellow Cards': 'two_y_card',
+            'Fouls': 'fouls',
+            'Fouled': 'fouled',
+            'Offsides': 'offside',
+            'Penalties Won': 'pens_won',
+            'Penalties Conceded': 'pens_con',
+            'Own Goals': 'own_goal',
+            'Posession Recovered': 'recov',
+            'Aerials Won': 'aerials_won',
+            'Aerials Lost': 'aerials_lost',
+            'Aerials Attempted': 'aerials_attempted',
+            'Aerial Success (%)': 'aerial_success'
         },
-    "Playing Time":
+    "playingtime":
         {
-
+            'Matches': 'matches',
+            'Minutes': 'minutes',
+            'Nineties': 'nineties',
+            'Starts': 'starts',
+            'Matches Completed': 'completed',
+            'Substitute Appearances': 'sub',
+            'Unused Substitute': 'sub_unused',
+            'Team Goals While on Pitch': 'onpitch_goals',
+            'Team Goals Against While on Pitch': 'onpitch_goals_ag',
+            'Team Goals +/- While on Pitch': 'onpitch_goals_delta',
+            'Team xG While on Pitch': 'onpitch_xg',
+            'Team xGA While on Pitch': 'onpitch_xga',
+            'Team xG +/- While on Pitch': 'onpitch_xg_delta',
         },
-    "Keepers":
+    "keepers":
         {
-
+            'Matches as Goalkeeper': 'matches_gk',
+            'Starts as Goalkeeper':  'starts_gk',
+            'Minutes as Goalkeeper': 'minutes_gk',
+            'Nineties as Goalkeeper': 'nineties_gk',
+            'Goals Against': 'goals_ag',
+            'Shots on Target Against': 'sot_ag',
+            'Saves': 'saves',
+            'Save Percentage (%)': 'save_perc',
+            'Wins as Goalkeeper': 'gk_won',
+            'Draws as Goalkeeper': 'gk_drew',
+            'Losses as Goalkeeper': 'gk_lost',
+            'Clean Sheets': 'cs',
+            'Clean Sheet Percentage (%)': 'clean_sheet_perc',
+            'Penalties Faced': 'pk_att_ag',
+            'Penalties Scored Against': 'pk_scored_ag',
+            'Penalties Saved': 'pk_saved',
+            'Penalty Save Percentage (%)': 'pk_save_perc',
+            'Penalties Missed Against': 'pk_missed_ag',
         },
-    "Keepers Advanced":
+    "keepersadv":
         {
-
+            'Free Kicks Against': 'fk_ag',
+            'Corner Kicks Against': 'ck_ag',
+            'Own Goals Against': 'og_ag',
+            'Post Shot xG Faced': 'ps_xg',
+            'Post Shot xG +/-': 'ps_xg_delta',
+            'Attempted Launches': 'att_launch',
+            'Completed Launches': 'cmp_launch',
+            'Launch Accuracy (%)': 'launch_completion',
+            'Passes Launched (%)': 'launch_perc',
+            'Attempted Keeper Passes': 'att_gk_pass',
+            'Attempted Keeper Passes (exc. dead)': 'att_pass_non_goal_kick',
+            'Attempted Throws': 'att_gk_throw',
+            'Avg Keeper Pass Length (exc. dead)': 'avg_gk_pass_len',
+            'Goal Kicks': 'att_goal_kick',
+            'Launched Goal Kicks': 'goal_kicks_launched',
+            'Goal Kick Launches (%)': 'goal_kick_launch_perc',
+            'Short Goal Kicks': 'att_launch_non_goal_kick',
+            'Avg Goal Kick Length': 'avg_goal_kick_len',
+            'Crosses Faced': 'att_cross_ag',
+            'Crosses Stopped': 'stop_cross_ag',
+            'Crosses Stopped (%)': 'cross_stop_perc',
+            'Defensive Actions Outside Pen': 'def_outside_pen',
+            'Average Distance of Defensive Actions': 'avg_def_outside_pen_dist',
+            'Goal Kicks Launched': 'goal_kicks_launched'
         }
 }
