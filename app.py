@@ -1,14 +1,17 @@
 from widgets import radio_item, drop_down, check_list, range_slider
 from dash import Dash
 from dash_bootstrap_components import Col, Row, Card, themes
-from dash import dcc
-from dash import html
-from dash.dependencies import Input, Output, State
+from dash import html, dcc, no_update
+from dash.dependencies import Input, Output, State, ClientsideFunction
 from plotly.express import scatter_3d, scatter
 from maps import cat_options, axis_options, seasons, comps, positions, not_per_min, aggregates
 from pandas import read_sql
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, cast
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -18,18 +21,22 @@ metadata.reflect(engine, only=cat_options.values())
 app = Dash(external_stylesheets=[themes.BOOTSTRAP])
 server = app.server
 
+
 with engine.connect() as conn:
     max_mins = conn.execute(
-        text("""select max(sum) from (select id, sum(minutes) from playingtime group by (id)) as x""")).scalar()
+        text("select max(sum) from (select id, sum(minutes) from playingtime group by (id)) as x")).scalar()
     max_value, max_age = conn.execute(
-        text("""select ceiling(max(current_value))::Integer, max(date_part('year', age(dob)))::Integer from player""")).all()[0]
+        text("select ceiling(max(current_value))::Integer, max(date_part('year', age(dob)))::Integer from player")).all()[0]
     clubs = conn.execute(
-        text("""select distinct club from player where current_value > 20.0 order by club""")).scalars().all()
+        text("select distinct club from player where current_value > 20.0 order by club")).scalars().all()
     nations = conn.execute(
-        text("""select distinct nationality from player order by nationality""")).scalars().all()
+        text("select distinct nationality from player order by nationality")).scalars().all()
+    names = conn.execute(
+        text("select name from player order by name")).scalars().all()
     conn.close()
 
 app.layout = Col([
+    dcc.Store(id='selected-data'),
     dcc.Markdown('''
         # FBREF-3D
     
@@ -118,6 +125,19 @@ app.layout = Col([
             ]),
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
+Card([
+        Row([
+            Col(html.Label('names')),
+        ]),
+        Row([
+            dcc.Dropdown(
+                id='names',
+                options=names,
+                value=[],
+                multi=True
+            ),
+        ]),
+    ], style={"width": "100%", "height": "50%"}, body=True),
     Row([
         html.Div([dcc.Graph(id='main-plot', config={'displayModeBar': False})])
     ])
@@ -125,7 +145,7 @@ app.layout = Col([
 
 
 @app.callback(
-    output=Output('main-plot', 'figure'),
+    Output('main-plot', 'figure'),
     inputs=[
         (
             Input('x', 'value'),
@@ -137,9 +157,9 @@ app.layout = Col([
 
         ),
         (
-            Input('xcat', 'value'),
-            Input('ycat', 'value'),
-            Input('zcat', 'value'),
+            State('xcat', 'value'),
+            State('ycat', 'value'),
+            State('zcat', 'value'),
         ),
         Input('club', 'value'),
         Input('nation', 'value'),
@@ -152,12 +172,13 @@ app.layout = Col([
         Input('colour', 'value'),
         Input('dimension', 'value'),
         Input('per_min', 'value'),
+        Input('names', 'value'),
     ],
     prevent_initial_call=True
 )
-def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, colour, dim, per_min):
+def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, colour, dim, per_min, names):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
-    query = make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, per_min)
+    query = make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, names, per_min)
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
     z_label = [x['label'] for x in xyz[5] if x['value'] == xyz[2]][0]
@@ -185,21 +206,15 @@ def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, com
                 'current_value': "Value",
                 'age': "Age",
                 'club': "Team"
-
-        },
+            }
         )
+    conn.close()
     if dim:
         plot = scatter_3d
         graph_params['z'] = 'z'
     else:
         plot = scatter
     fig = plot(**graph_params)
-    fig_updates(fig)
-    conn.close()
-    return fig
-
-
-def fig_updates(fig):
     fig.update_layout(
         height=700,
         autosize=True,
@@ -207,12 +222,13 @@ def fig_updates(fig):
         template="plotly_white",
     )
     fig.update_traces(
-        marker_size=5,
+        marker_size=5
     )
     fig.update_scenes(
         aspectratio=dict(x=1, y=1, z=1),
         aspectmode="auto"
     )
+    return fig
 
 
 def select_clause(sub, table):
@@ -238,7 +254,7 @@ def data_sub_query(sub, cat, seasons, comps, label):
     return query
 
 
-def player_sub_query(club, nationality, values, positions):
+def player_sub_query(club, nationality, values, positions, names):
     player = metadata.tables["player"]
     query = select(
         player.c["id"],
@@ -252,7 +268,8 @@ def player_sub_query(club, nationality, values, positions):
         (player.c["club"] == club if club != 'All' else true()) &
         (player.c["nationality"] == nationality if nationality != 'All' else true()) &
         (player.c["current_value"].between(values[0], values[1])) &
-        (player.c["position"].in_(positions))
+        (player.c["position"].in_(positions)) &
+        (player.c['name'].in_(names) if names != [] else true())
     ).subquery()
     return query
 
@@ -271,8 +288,8 @@ def mins_sub_query(seasons, comps):
     return query
 
 
-def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, per_min):
-    player = player_sub_query(club, nationality, values, positions)
+def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, names, per_min):
+    player = player_sub_query(club, nationality, values, positions, names)
     x = data_sub_query(xyz[0], xyz_cats[0], seasons, comps, 'x')
     y = data_sub_query(xyz[1], xyz_cats[1], seasons, comps, 'y')
     z = data_sub_query(xyz[2], xyz_cats[2], seasons, comps, 'z')
