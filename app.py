@@ -304,7 +304,7 @@ def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons,
         player.c["position"],
         player.c["current_value"],
         player.c["age"],
-        player.c["shortened"],
+        # player.c["shortened"],
         (x.c["x"] / mins.c["mins"] * 90).label('x') if per_min[0] else x.c["x"],
         (y.c["y"] / mins.c["mins"] * 90).label('y') if per_min[1] else y.c["y"],
         (z.c["z"] / mins.c["mins"] * 90).label('z') if per_min[2] else z.c["z"]
