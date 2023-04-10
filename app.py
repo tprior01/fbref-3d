@@ -9,9 +9,9 @@ from pandas import read_sql
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, cast
 
-from dotenv import load_dotenv
-
-load_dotenv()
+# from dotenv import load_dotenv
+#
+# load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -263,6 +263,7 @@ def player_sub_query(club, nationality, values, positions, names):
         player.c["nationality"],
         player.c["position"],
         player.c["current_value"],
+        # func.regexp_replace(player.c['name'], '^.* ', '').label('shortened'),
         extract('year', func.age(player.c["dob"])).label('age').cast(Integer),
     ).where(
         (player.c["club"] == club if club != 'All' else true()) &
@@ -303,6 +304,7 @@ def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons,
         player.c["position"],
         player.c["current_value"],
         player.c["age"],
+        player.c["shortened"],
         (x.c["x"] / mins.c["mins"] * 90).label('x') if per_min[0] else x.c["x"],
         (y.c["y"] / mins.c["mins"] * 90).label('y') if per_min[1] else y.c["y"],
         (z.c["z"] / mins.c["mins"] * 90).label('z') if per_min[2] else z.c["z"]
