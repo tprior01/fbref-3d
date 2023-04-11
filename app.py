@@ -9,9 +9,9 @@ from pandas import read_sql
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, false, cast, or_, and_
 from textalloc import allocate_text
-from dotenv import load_dotenv
-
-load_dotenv()
+# from dotenv import load_dotenv
+#
+# load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -44,8 +44,10 @@ app.layout = Col([
         # FBREF-3D
     
         A dashboard to visualise the data on fbref.com as 2D or 3D scatter graphs. The data is 
-        periodically scraped and added to a PostgreSQL database. 
-    '''),
+        periodically scraped and added to a PostgreSQL database. Annotations can be added by 
+        selecting data with the lasso tool or by specifying the quantiles to show. Annotations 
+        are automatically adjusted to avoid overlapping, which can take a few seconds to process.
+        '''),
     Card([
         Row([
             Col(html.Label('x-axis')),
@@ -80,7 +82,7 @@ app.layout = Col([
             Col(html.Label('per minute or totals'))
         ]),
         Row([
-            Col([Row([radio_item(id="dimension", options={"3D": True, "2D": False}, value=True)])]),
+            Col([Row([radio_item(id="dimension", options={"2D": True, "3D": False}, value=True)])]),
             Col([Row([radio_item(id="colour", options={"Z-Axis": "z", "Position": "position"}, value="z")])]),
             Col([Row([radio_item(id="per_min", options={"Per 90": True, "Total": False}, value=True)])])
         ]),
@@ -137,6 +139,29 @@ app.layout = Col([
             Col(radio_item(id="add-only", options={"add": True, "only": False}, value=True), width=2),
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
+    Card([
+        Row([
+            Col(html.Label('annotation')),
+            Col(html.Label('x-quantile')),
+            Col(html.Label('y-quantile')),
+            Col(html.Label('xy-quantile')),
+
+        ]),
+        Row([
+            Col([
+                radio_item(id="annotation", options=["quantile", "selection", "none"], value="quantile"),
+            ]),
+            Col([
+                dcc.Input(id='x-quantile', type='number', value=99.6, size='2', max=100.0, min=0.0, step=0.2)
+            ]),
+            Col([
+                dcc.Input(id='y-quantile', type='number', value=99.6, size='2', max=100.0, min=0.0, step=0.2)
+            ]),
+            Col([
+                dcc.Input(id='xy-quantile', type='number', value=95, size='2', max=100.0, min=0.0, step=0.2)
+            ]),
+        ]),
+    ], style={"width": "100%", "height": "50%"}, body=True),
     Row([
         html.Div([dcc.Graph(id='main-plot')]) #, config={'displayModeBar': False})])
     ])
@@ -145,11 +170,10 @@ app.layout = Col([
 
 app.clientside_callback(
     """
-    function(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) {
+    function(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s) {
         var w = window.innerWidth;
         return w;
     }
-    window.addEventListener("resize", showInnerWidth);
     """,
     Output('x_pixels', 'children'),
     Input('x', 'value'),
@@ -168,7 +192,11 @@ app.clientside_callback(
     Input('per_min', 'value'),
     Input('names', 'value'),
     Input('main-plot', 'selectedData'),
-    Input('add-only', 'value')
+    Input('add-only', 'value'),
+    Input('x-quantile', 'value'),
+    Input('y-quantile', 'value'),
+    Input('xy-quantile', 'value'),
+    Input('annotation', 'value')
 )
 
 
@@ -203,12 +231,18 @@ app.clientside_callback(
         State('names', 'value'),
         State('selected-data', 'data'),
         State('add-only', 'value'),
+        (
+            State('x-quantile', 'value'),
+            State('y-quantile', 'value'),
+            State('xy-quantile', 'value'),
+        ),
+        State('annotation', 'value'),
         Input('x_pixels', 'children'),
     ],
     prevent_initial_call=True
 )
-def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons,
-           comps, positions, colour, dim, per_min, names, selected_data, add, x_pixels):
+def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps,
+           positions, colour, dim, per_min, names, selected_data, add, quants, annotation, x_pixels):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     query = make_query(xyz, xyz_cats, club, nationality, ages, values, minutes,
                        seasons, comps, positions, names, per_min, add)
@@ -216,38 +250,47 @@ def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons,
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
     z_label = [x['label'] for x in xyz[5] if x['value'] == xyz[2]][0]
     with engine.connect() as conn:
-        graph_params = dict(
-            data_frame=read_sql(query, con=conn).round({'x': 3, 'y': 3, 'z': 3}).fillna(0),
-            x='x',
-            y='y',
-            color=colour,
-            hover_data=[
-                'name',
-                'nationality',
-                'position',
-                'current_value',
-                'age',
-                'club'
-            ],
-            labels={
-                "x": f"({x_label}) / 90" if per_min[0] else x_label,
-                "y": f"({y_label}) / 90" if per_min[1] else y_label,
-                "z": f"({z_label}) / 90" if per_min[2] else z_label,
-                "name": "Name",
-                'nationality': "Nation",
-                'position': "Position",
-                'current_value': "Value",
-                'age': "Age",
-                'club': "Team"
-            },
-        )
-    conn.close()
+        df = read_sql(query, con=conn).round({'x': 3, 'y': 3, 'z': 3}).fillna(0)
+        conn.close()
+    graph_params = dict(
+        data_frame=df,
+        x='x',
+        y='y',
+        color=colour,
+        hover_data=[
+            'name',
+            'nationality',
+            'position',
+            'current_value',
+            'age',
+            'club'
+        ],
+        labels={
+            "x": f"({x_label}) / 90" if per_min[0] else x_label,
+            "y": f"({y_label}) / 90" if per_min[1] else y_label,
+            "z": f"({z_label}) / 90" if per_min[2] else z_label,
+            "name": "Name",
+            'nationality': "Nation",
+            'position': "Position",
+            'current_value': "Value",
+            'age': "Age",
+            'club': "Team"
+        },
+    )
     if dim:
+        plot = scatter
+    else:
         plot = scatter_3d
         graph_params['z'] = 'z'
-    else:
-        plot = scatter
     fig = plot(**graph_params)
+    if annotation == 'none':
+        selected_data = None
+    elif annotation == 'quantile':
+        quants = [q / 100 for q in quants]
+        o = df[(df['x'] > df['x'].quantile(quants[0])) | (df['y'] > df['y'].quantile(quants[1]))
+               | ((df['x'] > df['x'].quantile(quants[2])) & (df['y'] > df['y'].quantile(quants[2])))]
+        selected_data = {
+            'points': [{'x': o.loc[i]['x'], 'y': o.loc[i]['y'], 'customdata': [o.loc[i]['name']]} for i in o.index]}
     if selected_data is not None and selected_data != {'points': []} and plot == scatter:
         # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
         allocate_text(
@@ -263,7 +306,6 @@ def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons,
         autosize=True,
         margin=dict(t=0, b=0, l=0, r=0),
         template="plotly_white",
-        legend={'traceorder':'normal'},
         font_family='Arial'
     )
     fig.update_traces(
@@ -322,7 +364,6 @@ def player_sub_query(club, nationality, values, positions, names, add):
         player.c["nationality"],
         player.c["position"],
         player.c["current_value"],
-        # func.regexp_replace(player.c['name'], '^.* ', '').label('shortened'),
         extract('year', func.age(player.c["dob"])).label('age').cast(Integer),
     ).where(
         or_(
