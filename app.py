@@ -7,11 +7,11 @@ from plotly.express import scatter_3d, scatter
 from maps import cat_options, axis_options, seasons, comps, positions, not_per_min, aggregates
 from pandas import read_sql
 from os import environ
-from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, cast
+from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, false, cast, or_, and_
+from textalloc import allocate_text
+from dotenv import load_dotenv
 
-# from dotenv import load_dotenv
-#
-# load_dotenv()
+load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -36,6 +36,9 @@ with engine.connect() as conn:
     conn.close()
 
 app.layout = Col([
+    html.Div([
+        html.Div(id='x_pixels')
+    ], style={'display': 'none'}),
     dcc.Store(id='selected-data'),
     dcc.Markdown('''
         # FBREF-3D
@@ -125,32 +128,57 @@ app.layout = Col([
             ]),
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
-Card([
+    Card([
         Row([
             Col(html.Label('names')),
         ]),
         Row([
-            dcc.Dropdown(
-                id='names',
-                options=names,
-                value=[],
-                multi=True
-            ),
+            Col(dcc.Dropdown(id='names', options=names, value=[], multi=True), width=10),
+            Col(radio_item(id="add-only", options={"add": True, "only": False}, value=True), width=2),
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
     Row([
-        html.Div([dcc.Graph(id='main-plot', config={'displayModeBar': False})])
+        html.Div([dcc.Graph(id='main-plot')]) #, config={'displayModeBar': False})])
     ])
 ])
+
+
+app.clientside_callback(
+    """
+    function(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p) {
+        var w = window.innerWidth;
+        return w;
+    }
+    window.addEventListener("resize", showInnerWidth);
+    """,
+    Output('x_pixels', 'children'),
+    Input('x', 'value'),
+    Input('y', 'value'),
+    Input('z', 'value'),
+    Input('club', 'value'),
+    Input('nation', 'value'),
+    Input('ages', 'value'),
+    Input('values', 'value'),
+    Input('minutes', 'value'),
+    Input('seasons', 'value'),
+    Input('competitions', 'value'),
+    Input('positions', 'value'),
+    Input('colour', 'value'),
+    Input('dimension', 'value'),
+    Input('per_min', 'value'),
+    Input('names', 'value'),
+    Input('main-plot', 'selectedData'),
+    Input('add-only', 'value')
+)
 
 
 @app.callback(
     Output('main-plot', 'figure'),
     inputs=[
         (
-            Input('x', 'value'),
-            Input('y', 'value'),
-            Input('z', 'value'),
+            State('x', 'value'),
+            State('y', 'value'),
+            State('z', 'value'),
             State('x', 'options'),
             State('y', 'options'),
             State('z', 'options'),
@@ -161,24 +189,29 @@ Card([
             State('ycat', 'value'),
             State('zcat', 'value'),
         ),
-        Input('club', 'value'),
-        Input('nation', 'value'),
-        Input('ages', 'value'),
-        Input('values', 'value'),
-        Input('minutes', 'value'),
-        Input('seasons', 'value'),
-        Input('competitions', 'value'),
-        Input('positions', 'value'),
-        Input('colour', 'value'),
-        Input('dimension', 'value'),
-        Input('per_min', 'value'),
-        Input('names', 'value'),
+        State('club', 'value'),
+        State('nation', 'value'),
+        State('ages', 'value'),
+        State('values', 'value'),
+        State('minutes', 'value'),
+        State('seasons', 'value'),
+        State('competitions', 'value'),
+        State('positions', 'value'),
+        State('colour', 'value'),
+        State('dimension', 'value'),
+        State('per_min', 'value'),
+        State('names', 'value'),
+        State('selected-data', 'data'),
+        State('add-only', 'value'),
+        Input('x_pixels', 'children'),
     ],
     prevent_initial_call=True
 )
-def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, colour, dim, per_min, names):
+def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons,
+           comps, positions, colour, dim, per_min, names, selected_data, add, x_pixels):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
-    query = make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, names, per_min)
+    query = make_query(xyz, xyz_cats, club, nationality, ages, values, minutes,
+                       seasons, comps, positions, names, per_min, add)
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
     z_label = [x['label'] for x in xyz[5] if x['value'] == xyz[2]][0]
@@ -206,7 +239,7 @@ def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, com
                 'current_value': "Value",
                 'age': "Age",
                 'club': "Team"
-            }
+            },
         )
     conn.close()
     if dim:
@@ -215,20 +248,46 @@ def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, com
     else:
         plot = scatter
     fig = plot(**graph_params)
+    if selected_data is not None and selected_data != {'points': []} and plot == scatter:
+        # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
+        allocate_text(
+            selected_data['points'],
+            fig,
+            x_pixels - (53 + 93 + (121 - 93) * (x_pixels - 450) / (1920 - 450)),
+            700,
+            graph_params['data_frame']['x'].tolist(),
+            graph_params['data_frame']['y'].tolist(),
+        )
     fig.update_layout(
         height=700,
         autosize=True,
         margin=dict(t=0, b=0, l=0, r=0),
         template="plotly_white",
+        legend={'traceorder':'normal'},
+        font_family='Arial'
     )
     fig.update_traces(
-        marker_size=5
+        marker_size=5,
     )
     fig.update_scenes(
         aspectratio=dict(x=1, y=1, z=1),
         aspectmode="auto"
     )
+    fig.update_coloraxes(
+        colorbar_title=dict(
+            side='right'
+        )
+    )
     return fig
+
+
+@app.callback(
+    Output('selected-data', 'data'),
+    Input('main-plot', 'selectedData'),
+    prevent_initial_call=True
+)
+def selection(selected_data):
+    return selected_data
 
 
 def select_clause(sub, table):
@@ -254,7 +313,7 @@ def data_sub_query(sub, cat, seasons, comps, label):
     return query
 
 
-def player_sub_query(club, nationality, values, positions, names):
+def player_sub_query(club, nationality, values, positions, names, add):
     player = metadata.tables["player"]
     query = select(
         player.c["id"],
@@ -266,11 +325,16 @@ def player_sub_query(club, nationality, values, positions, names):
         # func.regexp_replace(player.c['name'], '^.* ', '').label('shortened'),
         extract('year', func.age(player.c["dob"])).label('age').cast(Integer),
     ).where(
-        (player.c["club"] == club if club != 'All' else true()) &
-        (player.c["nationality"] == nationality if nationality != 'All' else true()) &
-        (player.c["current_value"].between(values[0], values[1])) &
-        (player.c["position"].in_(positions)) &
-        (player.c['name'].in_(names) if names != [] else true())
+        or_(
+            and_(
+                (player.c["club"] == club if club != 'All' else true()),
+                (player.c["nationality"] == nationality if nationality != 'All' else true()),
+                (player.c["current_value"].between(values[0], values[1])),
+                (player.c["position"].in_(positions)),
+            ),
+            (player.c['name'].in_(names) if names != [] else false()),
+        )
+        if add else player.c['name'].in_(names),
     ).subquery()
     return query
 
@@ -289,8 +353,8 @@ def mins_sub_query(seasons, comps):
     return query
 
 
-def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, names, per_min):
-    player = player_sub_query(club, nationality, values, positions, names)
+def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, names, per_min, add):
+    player = player_sub_query(club, nationality, values, positions, names, add)
     x = data_sub_query(xyz[0], xyz_cats[0], seasons, comps, 'x')
     y = data_sub_query(xyz[1], xyz_cats[1], seasons, comps, 'y')
     z = data_sub_query(xyz[2], xyz_cats[2], seasons, comps, 'z')
