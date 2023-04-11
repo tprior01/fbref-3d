@@ -100,6 +100,7 @@ axis_options = {
     "shooting":
         {
             "Goals": "goals",
+            "Non Penalty Goals": 'non_penalty_goals',
             "Shots": "shot",
             "Shots on Target": "shot_on_target",
             "Freekicks": "fk",
