@@ -11,9 +11,6 @@ from sqlalchemy import text, create_engine, select, MetaData, func, extract, Int
 from textalloc import allocate_text
 from sklearn.ensemble import IsolationForest
 from numpy import vectorize
-from dotenv import load_dotenv
-
-load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
