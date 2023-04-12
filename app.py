@@ -281,8 +281,8 @@ def update(xyz, data, dim, per_min, outliers, annotation, colour, x_pixels):
             preds = isf.fit_predict(df[['x', 'y']])
             df["iso_forest_outliers"] = preds
             df = df[df["iso_forest_outliers"] == -1]
-            df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
         # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
+        df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
         allocate_text(
             df['x'].tolist(),
             df['y'].tolist(),
