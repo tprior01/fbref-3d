@@ -155,8 +155,8 @@ app.layout = Col([
             Col(html.Label('names')),
         ]),
         Row([
-            Col(dcc.Dropdown(id='names', options=names, value=[], multi=True), width=10),
-            Col(radio_item(id="add-only", options={"add": True, "only": False}, value=True), width=2),
+            Col(dcc.Dropdown(id='names', options=names, value=[], multi=True), width=8),
+            Col(radio_item(id="add-only", options=["add and annotate", "add", "only"], value="add and annotate"), width=4),
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
     Row([
@@ -234,11 +234,13 @@ def get_dataframe(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, c
         State('outliers', 'value'),
         State('annotation', 'value'),
         State('colour', 'value'),
+        State('names', 'value'),
+        State('add-only', 'value'),
         Input('x_pixels', 'children'),
     ],
     prevent_initial_call=True
 )
-def update(xyz, data, dim, per_min, outliers, annotation, colour, x_pixels):
+def update(xyz, data, dim, per_min, outliers, annotation, colour, names, add, x_pixels):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
@@ -281,7 +283,10 @@ def update(xyz, data, dim, per_min, outliers, annotation, colour, x_pixels):
             isf = IsolationForest(n_estimators=100, random_state=42, contamination=0.5 if outliers/l > 0.5 else outliers/l)
             preds = isf.fit_predict(df[['x', 'y']])
             df["iso_forest_outliers"] = preds
-            df = df[df["iso_forest_outliers"] == -1]
+            if add == 'add and annotate':
+                df = df[(df["iso_forest_outliers"] == -1) | df['name'].isin(names)]
+            else:
+                df = df[df["iso_forest_outliers"] == -1]
             df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
         # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
         allocate_text(
@@ -403,7 +408,7 @@ def player_sub_query(club, nationality, values, positions, names, add):
             ),
             (player.c['name'].in_(names) if names != [] else false()),
         )
-        if add else player.c['name'].in_(names),
+        if add == 'add' or add == 'add and annotate' else player.c['name'].in_(names),
     ).subquery()
     return query
 
