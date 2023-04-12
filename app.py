@@ -10,11 +10,7 @@ from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, false, cast, or_, and_
 from textalloc import allocate_text
 from sklearn.ensemble import IsolationForest
-from dotenv import load_dotenv
 from numpy import vectorize
-
-load_dotenv()
-
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -28,9 +24,7 @@ with engine.connect() as conn:
     max_mins = conn.execute(
         text("select max(sum) from (select id, sum(minutes) from playingtime group by (id)) as x")).scalar()
     max_value, max_age = conn.execute(
-        text(
-            "select ceiling(max(current_value))::Integer, max(date_part('year', age(dob)))::Integer from player")).all()[
-        0]
+        text("select ceiling(max(current_value))::Integer,max(date_part('year',age(dob)))::Integer from player")).all()[0]
     clubs = conn.execute(
         text("select distinct club from player where current_value > 20.0 order by club")).scalars().all()
     nations = conn.execute(
@@ -90,11 +84,31 @@ app.layout = Col([
             Col(Row(html.Label('no.'), justify='center'), width=1)
         ]),
         Row([
-            Col([Row([radio_item(id="dimension", options={"2D": True, "3D": False}, value=True)], justify='center')], width=3),
-            Col([Row([radio_item(id="colour", options={"Z-Axis": "z", "Position": "position"}, value="z")], justify='center')], width=3),
-            Col([Row([radio_item(id="per_min", options={"Per 90": True, "Total": False}, value=True)], justify='center')], width=3),
-            Col([Row([radio_item(id="annotation", options=["outliers", "none"], value="outliers")], justify='center')], width=2),
-            Col([Row([dcc.Input(id='outliers', type='number', value=20, size='2', max=50, min=0, step=1)], justify='center')], width=1)
+            Col([
+                Row([
+                    radio_item(id="dimension", options={"2D": True, "3D": False}, value=True)
+                ], justify='center')
+            ], width=3),
+            Col([
+                Row([
+                    radio_item(id="colour", options={"Z-Axis": "z", "Position": "position"}, value="z")
+                ], justify='center')
+            ], width=3),
+            Col([
+                Row([
+                    radio_item(id="per_min", options={"Per 90": True, "Total": False}, value=True)
+                ], justify='center')
+            ], width=3),
+            Col([
+                Row([
+                    radio_item(id="annotation", options=["outliers", "none"], value="outliers")
+                ], justify='center')
+            ], width=2),
+            Col([
+                Row([
+                    dcc.Input(id='outliers', type='number', value=20, size='2', max=50, min=0, step=1)
+                ], justify='center')
+            ], width=1)
         ]),
     ], style={"width": "100%"}, body=True),
     Card([
@@ -149,23 +163,8 @@ app.layout = Col([
             Col(radio_item(id="add-only", options={"add": True, "only": False}, value=True), width=2),
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
-    # Card([
-    #     Row([
-    #         Col(html.Label('annotation')),
-    #         Col(html.Label('number of outliers'))
-    #
-    #     ]),
-    #     Row([
-    #         Col([
-    #             radio_item(id="annotation", options=["outliers", "none"], value="outliers"),
-    #         ]),
-    #         Col([
-    #             dcc.Input(id='outliers', type='number', value=20, size='2', max=50, min=0, step=1)
-    #         ])
-    #     ]),
-    # ], style={"width": "100%", "height": "50%"}, body=True),
     Row([
-        html.Div([dcc.Graph(id='main-plot')])  # , config={'displayModeBar': False})])
+        html.Div([dcc.Graph(id='main-plot')], config={'displayModeBar': False})
     ])
 ])
 
