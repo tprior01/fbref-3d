@@ -46,6 +46,7 @@ app.layout = Col([
         periodically scraped and added to a PostgreSQL database. Annotations can be added by 
         selecting data with the lasso tool or by specifying the quantiles to show. Annotations 
         are automatically adjusted to avoid overlapping, which can take a few seconds to process.
+        The number of annotations is limited to 100.
         '''),
     Card([
         Row([
@@ -292,7 +293,7 @@ def update(xyz, data, dim, per_min, selected_data, quants, annotation, colour, x
                | ((df['x'] > df['x'].quantile(quants[2])) & (df['y'] > df['y'].quantile(quants[2])))]
         selected_data = {
             'points': [{'x': o.loc[i]['x'], 'y': o.loc[i]['y'], 'customdata': [o.loc[i]['name']]} for i in o.index]}
-    if selected_data is not None and selected_data != {'points': []} and plot == scatter:
+    if selected_data is not None and selected_data != {'points': []} and plot == scatter and len(selected_data) < 100:
         # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
         allocate_text(
             selected_data['points'],
