@@ -39,11 +39,9 @@ app.layout = Col([
     dcc.Markdown('''
         # FBREF-3D
     
-        A dashboard to visualise the data on fbref.com as 2D or 3D scatter graphs. The data is 
-        periodically scraped and added to a PostgreSQL database. Annotations can be added by 
-        selecting data with the lasso tool or by specifying the quantiles to show. Annotations 
-        are automatically adjusted to avoid overlapping, which can take a few seconds to process.
-        The number of annotations is limited to 100.
+        A dashboard to visualise the data on fbref.com as 2D or 3D scatter graphs. The data is periodically scraped and 
+        added to a PostgreSQL database. Annotations are automatically adjusted to avoid overlapping, which can take a 
+        few seconds to process. The number of annotations is limited to 50.
         '''),
     Card([
         Row([
