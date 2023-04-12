@@ -11,6 +11,9 @@ from sqlalchemy import text, create_engine, select, MetaData, func, extract, Int
 from textalloc import allocate_text
 from sklearn.ensemble import IsolationForest
 from numpy import vectorize
+from dotenv import load_dotenv
+
+load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -275,12 +278,13 @@ def update(xyz, data, dim, per_min, outliers, annotation, colour, x_pixels):
         graph_params['z'] = 'z'
     fig = plot(**graph_params)
     if annotation == 'outliers':
-        isf = IsolationForest(n_estimators=100, random_state=42, contamination=outliers/len(df.index))
-        preds = isf.fit_predict(df[['x', 'y']])
-        df["iso_forest_outliers"] = preds
-        df = df[df["iso_forest_outliers"] == -1]
-        df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
-
+        l = len(df.index)
+        if l > 50:
+            isf = IsolationForest(n_estimators=100, random_state=42, contamination=0.5 if outliers/l > 0.5 else outliers/l)
+            preds = isf.fit_predict(df[['x', 'y']])
+            df["iso_forest_outliers"] = preds
+            df = df[df["iso_forest_outliers"] == -1]
+            df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
         # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
         allocate_text(
             df['x'].tolist(),
