@@ -29,6 +29,20 @@ cat_options = {
     "Keepers Advanced": "keepersadv"
 }
 
+cat_options2 = {
+    "Combined": "combined",
+    "Shooting": "shooting",
+    "Passing": "passing",
+    "Pass Types": "passing_types",
+    "Shot Creation": "gca",
+    "Possession": "possession",
+    "Defense": "defense",
+    "Miscellaneous": "misc",
+    "Playing Time": "playingtime",
+    "Keepers": "keepers",
+    "Keepers Advanced": "keepersadv"
+}
+
 positions = [
     "Goalkeeper",
     "Centre-Back",
@@ -93,14 +107,26 @@ aggregates = {
     "npxg_per_shot": ["npxg", "shot", 1, Numeric(3, 2)],
     "avg_shot_dist": ["tot_shot_dist", "shot", 1, Numeric(4, 1)],
     "aerial_success": ["aerials_won", "aerials_attempted", 100, Numeric(4, 1)],
-    "launch_perc": ["att_launch_non_goal_kick", "att_pass_non_goal_kick", 100, Numeric(4, 1)]
+    "launch_perc": ["att_launch_non_goal_kick", "att_pass_non_goal_kick", 100, Numeric(4, 1)],
+}
+
+combined = {
+    "non_penalty_goals_and_xa": ["non_penalty_goals", "xa", 'shooting', 'passing'],
+    "npxg_and_xa": ["npxg", "xa", 'shooting', 'passing'],
+    "non_penalty_goals_and_assists": ["non_penalty_goals", "assist", 'shooting', 'passing'],
 }
 
 axis_options = {
+    "combined":
+        {
+            "Non Penalty Goals + xA": 'non_penalty_goals_and_xa',
+            "npxG + xA": "npxg_and_xa",
+            "Non Penalty Goals + ": 'non_penalty_goals_and_assists'
+        },
     "shooting":
         {
-            "Goals": "goals",
             "Non Penalty Goals": 'non_penalty_goals',
+            "Goals": "goals",
             "Shots": "shot",
             "Shots on Target": "shot_on_target",
             "Freekicks": "fk",
