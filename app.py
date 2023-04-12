@@ -36,7 +36,7 @@ with engine.connect() as conn:
 
 app.layout = Col([
     html.Div([html.Div(id='x_pixels')], style={'display': 'none'}),
-    dcc.Store(id='dataframe', storage_type='session'),
+    dcc.Store(id='dataframe'),
     dcc.Markdown('''
         # FBREF-3D
     
