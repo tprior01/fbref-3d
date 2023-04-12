@@ -34,10 +34,7 @@ with engine.connect() as conn:
     conn.close()
 
 app.layout = Col([
-    html.Div([
-        html.Div(id='x_pixels')
-    ], style={'display': 'none'}),
-    dcc.Store(id='selected-data'),
+    html.Div([html.Div(id='x_pixels')], style={'display': 'none'}),
     dcc.Store(id='dataframe'),
     dcc.Markdown('''
         # FBREF-3D
@@ -164,7 +161,7 @@ app.layout = Col([
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
     Row([
-        html.Div([dcc.Graph(id='main-plot')], config={'displayModeBar': False})
+        html.Div([dcc.Graph(id='main-plot', config={'displayModeBar': False})])
     ])
 ])
 
@@ -235,7 +232,6 @@ def get_dataframe(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, c
         State('dataframe', 'data'),
         State('dimension', 'value'),
         State('per_min', 'value'),
-        State('selected-data', 'data'),
         State('outliers', 'value'),
         State('annotation', 'value'),
         State('colour', 'value'),
@@ -243,7 +239,7 @@ def get_dataframe(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, c
     ],
     prevent_initial_call=True
 )
-def update(xyz, data, dim, per_min, selected_data, outliers, annotation, colour, x_pixels):
+def update(xyz, data, dim, per_min, outliers, annotation, colour, x_pixels):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
@@ -318,15 +314,6 @@ def update(xyz, data, dim, per_min, selected_data, outliers, annotation, colour,
         )
     )
     return fig
-
-
-@app.callback(
-    Output('selected-data', 'data'),
-    Input('main-plot', 'selectedData'),
-    prevent_initial_call=True
-)
-def selection(selected_data):
-    return selected_data
 
 
 def select_clause(sub, table):
