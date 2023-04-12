@@ -287,7 +287,7 @@ def update(xyz, data, dim, per_min, outliers, annotation, colour, names, add, x_
                 df = df[(df["iso_forest_outliers"] == -1) | df['name'].isin(names)]
             else:
                 df = df[df["iso_forest_outliers"] == -1]
-            df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
+        df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
         # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
         allocate_text(
             df['x'].tolist(),
