@@ -14,7 +14,6 @@ def check_list(id, options):
     return dcc.Checklist(
         options=options if isinstance(options, list) else [{'label': k, 'value': v} for k, v in options.items()],
         value=options if isinstance(options, list) else [value for value in options.values()],
-        # inline=True,
         id=id
     )
 
