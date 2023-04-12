@@ -11,7 +11,9 @@ from PIL import ImageFont
 
 
 def allocate_text(
-    selected_points,
+    x,
+    y,
+    text_list,
     fig,
     x_pixels,
     y_pixels,
@@ -60,8 +62,10 @@ def allocate_text(
 
     x_per_pixel = (xlims[1] - xlims[0]) / x_pixels
     y_per_pixel = (ylims[1] - ylims[0]) / y_pixels
-    x = np.array([point['x'] for point in selected_points])
-    y = np.array([point['y'] for point in selected_points])
+    # x = np.array([point['x'] for point in selected_points])
+    # y = np.array([point['y'] for point in selected_points])
+    x = np.array(x)
+    y = np.array(y)
     assert len(x) == len(y)
 
     if x_scatter is not None:
@@ -89,8 +93,6 @@ def allocate_text(
     original_boxes = []
 
     font = ImageFont.truetype('assets/fonts/arial.ttf', textsize)
-
-    text_list = [point['customdata'][0].split(' ')[-1] for point in selected_points]
 
     for x_coord, y_coord, s in tqdm(zip(x, y, text_list), disable=not verbose):
         w, h = font.getlength(s) * x_per_pixel, textsize * y_per_pixel
