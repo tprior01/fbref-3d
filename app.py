@@ -9,6 +9,9 @@ from pandas import read_sql, DataFrame
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, false, cast, or_, and_
 from textalloc import allocate_text
+# from dotenv import load_dotenv
+#
+# load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -248,6 +251,7 @@ def get_dataframe(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, c
     prevent_initial_call=True
 )
 def update(xyz, data, dim, per_min, selected_data, quants, annotation, colour, x_pixels):
+    print('update')
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
@@ -490,4 +494,4 @@ def update_z_value(options):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True, use_reloader=False)
+    app.run_server(debug=False, use_reloader=False)
