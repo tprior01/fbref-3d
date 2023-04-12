@@ -1,5 +1,5 @@
 """
-Code taken from https://github.com/ckjellson/textalloc
+Code adapted from https://github.com/ckjellson/textalloc
 """
 
 import numpy as np
@@ -7,7 +7,6 @@ from typing import Tuple, List
 from textalloc.candidates import generate_candidates
 from textalloc.overlap_functions import (
     non_overlapping_with_points,
-    non_overlapping_with_lines,
     non_overlapping_with_boxes,
     inside_plot,
 )
@@ -21,11 +20,9 @@ def get_non_overlapping_boxes(
     margin: float,
     min_distance: float,
     max_distance: float,
-    verbose: bool,
     nbr_candidates: int,
     draw_all: bool,
     scatter_xy: np.ndarray = None,
-    lines_xyxy: np.ndarray = None,
 ) -> Tuple[List[Tuple[float, float, float, float, str, int]], List[int]]:
     """Finds boxes that do not have an overlap with any other objects.
     Args:
@@ -35,11 +32,9 @@ def get_non_overlapping_boxes(
         margin (float): parameter for margins between objects. Increase for larger margins to points and lines.
         min_distance (float): parameter for max distance between text and origin.
         max_distance (float): parameter for max distance between text and origin.
-        verbose (bool): prints progress using tqdm.
         nbr_candidates (int): Sets the number of candidates used.
         draw_all (bool): Draws all texts after allocating as many as possible despit overlap.
         scatter_xy (np.ndarray, optional): 2d array of scattered points in plot.
-        lines_xyxy (np.ndarray, optional): 2d array of line segments in plot.
     Returns:
         Tuple[List[Tuple[float, float, float, float, str, int]], List[int]]: data of non-overlapping boxes and indices of overlapping boxes.
     """
@@ -59,7 +54,7 @@ def get_non_overlapping_boxes(
     # Iterate original boxes and find ones that do not overlap by creating multiple candidates
     non_overlapping_boxes = []
     overlapping_boxes_inds = []
-    for i, box in tqdm(enumerate(original_boxes), disable=not verbose):
+    for i, box in enumerate(original_boxes):
         x_original, y_original, w, h, s = box
         candidates = generate_candidates(
             w,
@@ -80,12 +75,7 @@ def get_non_overlapping_boxes(
             non_op = non_overlapping_with_points(
                 scatter_xy, candidates, xmargin, ymargin
             )
-        if lines_xyxy is None:
-            non_ol = np.zeros((candidates.shape[0],)) == 0
-        else:
-            non_ol = non_overlapping_with_lines(
-                lines_xyxy, candidates, xmargin, ymargin
-            )
+        non_ol = np.zeros((candidates.shape[0],)) == 0
         if box_arr.shape[0] == 0:
             non_orec = np.zeros((candidates.shape[0],)) == 0
         else:

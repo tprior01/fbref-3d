@@ -2,10 +2,8 @@
 Code adapted from https://github.com/ckjellson/textalloc
 """
 
-from tqdm import tqdm
 from textalloc.non_overlapping_boxes import get_non_overlapping_boxes
 import numpy as np
-import time
 from typing import List, Tuple, Union
 from PIL import ImageFont
 
@@ -19,13 +17,10 @@ def allocate_text(
     y_pixels,
     x_scatter: Union[np.ndarray, List[float]] = None,
     y_scatter: Union[np.ndarray, List[float]] = None,
-    x_lines: List[Union[np.ndarray, List[float]]] = None,
-    y_lines: List[Union[np.ndarray, List[float]]] = None,
     textsize: int = 10,
     margin: float = 0.00,
     min_distance: float = 0.0075,
     max_distance: float = 0.07,
-    verbose: bool = False,
     draw_lines: bool = True,
     linecolor: str = "grey",
     draw_all: bool = True,
@@ -44,16 +39,11 @@ def allocate_text(
         margin (float, optional): parameter for margins between objects. Increase for larger margins to points and lines. Defaults to 0.01.
         min_distance (float, optional): parameter for min distance between text and origin. Defaults to 0.015.
         max_distance (float, optional): parameter for max distance between text and origin. Defaults to 0.07.
-        verbose (bool, optional): prints progress using tqdm. Defaults to False.
         draw_lines (bool, optional): draws lines from original points to textboxes. Defaults to True.
         linecolor (str, optional): color code of the lines between points and text-boxes. Defaults to "r".
         draw_all (bool, optional): Draws all texts after allocating as many as possible despit overlap. Defaults to True.
         nbr_candidates (int, optional): Sets the number of candidates used. Defaults to 0.
-        linewidth (float, optional): width of line. Defaults to 1.
-        textcolor (str, optional): color code of the text. Defaults to "k".
     """
-    t0 = time.time()
-
     full_fig = fig.full_figure_for_development(warn=False)
     xlims = full_fig.layout.xaxis.range
     ylims = full_fig.layout.yaxis.range
@@ -62,8 +52,6 @@ def allocate_text(
 
     x_per_pixel = (xlims[1] - xlims[0]) / x_pixels
     y_per_pixel = (ylims[1] - ylims[0]) / y_pixels
-    # x = np.array([point['x'] for point in selected_points])
-    # y = np.array([point['y'] for point in selected_points])
     x = np.array(x)
     y = np.array(y)
     assert len(x) == len(y)
@@ -75,40 +63,23 @@ def allocate_text(
         assert len(y_scatter) == len(x_scatter)
         x_scatter = np.array(x_scatter)
         y_scatter = np.array(y_scatter)
-    if x_lines is not None:
-        assert y_lines is not None
-    if y_lines is not None:
-        assert x_lines is not None
-        assert all(
-            [len(x_line) == len(y_line) for x_line, y_line in zip(x_lines, y_lines)]
-        )
-        x_lines = [np.array(x_line) for x_line in x_lines]
-        y_lines = [np.array(y_line) for y_line in y_lines]
     assert min_distance <= max_distance
     assert min_distance >= margin
 
     # Create boxes in original plot
-    if verbose:
-        print("Creating boxes")
     original_boxes = []
 
     font = ImageFont.truetype('assets/fonts/arial.ttf', textsize)
 
-    for x_coord, y_coord, s in tqdm(zip(x, y, text_list), disable=not verbose):
+    for x_coord, y_coord, s in zip(x, y, text_list):
         w, h = font.getlength(s) * x_per_pixel, textsize * y_per_pixel
         original_boxes.append((x_coord, y_coord, w, h, s))
 
     # Process extracted textboxes
-    if verbose:
-        print("Processing")
     if x_scatter is None:
         scatterxy = None
     else:
         scatterxy = np.transpose(np.vstack([x_scatter, y_scatter]))
-    if x_lines is None:
-        lines_xyxy = None
-    else:
-        lines_xyxy = lines_to_segments(x_lines, y_lines)
     non_overlapping_boxes, overlapping_boxes_inds = get_non_overlapping_boxes(
         original_boxes,
         xlims,
@@ -116,16 +87,12 @@ def allocate_text(
         margin,
         min_distance,
         max_distance,
-        verbose,
         nbr_candidates,
         draw_all,
         scatter_xy=scatterxy,
-        lines_xyxy=lines_xyxy,
     )
 
     # Plot once again
-    if verbose:
-        print("Plotting")
     if draw_lines:
         for x_coord, y_coord, w, h, s, ind in non_overlapping_boxes:
             x_near, y_near = find_nearest_point_on_box(
@@ -170,9 +137,6 @@ def allocate_text(
                     font=dict(size=textsize)
                 )
             )
-
-    if verbose:
-        print(f"Finished in {time.time()-t0}s")
 
 
 def find_nearest_point_on_box(
