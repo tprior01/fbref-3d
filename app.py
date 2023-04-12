@@ -9,9 +9,9 @@ from pandas import read_sql
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, false, cast, or_, and_
 from textalloc import allocate_text
-from dotenv import load_dotenv
-
-load_dotenv()
+# from dotenv import load_dotenv
+#
+# load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -409,7 +409,6 @@ def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons,
         player.c["position"],
         player.c["current_value"],
         player.c["age"],
-        # player.c["shortened"],
         (x.c["x"] / mins.c["mins"] * 90).label('x') if per_min[0] else x.c["x"],
         (y.c["y"] / mins.c["mins"] * 90).label('y') if per_min[1] else y.c["y"],
         (z.c["z"] / mins.c["mins"] * 90).label('z') if per_min[2] else z.c["z"]
