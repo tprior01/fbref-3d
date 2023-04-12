@@ -11,3 +11,4 @@ tqdm==4.65.0
 Pillow==9.5.0
 numpy==1.24.2
 kaleido==0.2.1
+scikit-learn==1.2.2
