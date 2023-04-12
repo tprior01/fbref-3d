@@ -148,7 +148,7 @@ app.layout = Col([
         ]),
         Row([
             Col([
-                radio_item(id="annotation", options=["quantile", "selection", "none"], value="quantile"),
+                radio_item(id="annotation", options=["quantile", "selection", "none"], value="selection"),
             ]),
             Col([
                 dcc.Input(id='x-quantile', type='number', value=99.6, size='2', max=100.0, min=0.0, step=0.2)
@@ -237,9 +237,9 @@ def get_dataframe(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, c
         State('per_min', 'value'),
         State('selected-data', 'data'),
         (
-                State('x-quantile', 'value'),
-                State('y-quantile', 'value'),
-                State('xy-quantile', 'value'),
+            State('x-quantile', 'value'),
+            State('y-quantile', 'value'),
+            State('xy-quantile', 'value'),
         ),
         State('annotation', 'value'),
         State('colour', 'value'),
