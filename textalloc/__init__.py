@@ -33,8 +33,6 @@ def allocate_text(
         y_pixels (float): height of plot area in pixels.
         x_scatter (Union[np.ndarray, List[float]], optional): x-coordinates of all scattered points in plot 1d array/list. Defaults to None.
         y_scatter (Union[np.ndarray, List[float]], optional): y-coordinates of all scattered points in plot 1d array/list. Defaults to None.
-        x_lines (List[Union[np.ndarray, List[float]]], optional): x-coordinates of all lines in plot list of 1d arrays/lists. Defaults to None.
-        y_lines (List[Union[np.ndarray, List[float]]], optional): y-coordinates of all lines in plot list of 1d arrays/lists. Defaults to None.
         textsize (int, optional): size of text. Defaults to 10.
         margin (float, optional): parameter for margins between objects. Increase for larger margins to points and lines. Defaults to 0.01.
         min_distance (float, optional): parameter for min distance between text and origin. Defaults to 0.015.
@@ -49,7 +47,6 @@ def allocate_text(
     ylims = full_fig.layout.yaxis.range
 
     # Ensure good inputs
-
     x_per_pixel = (xlims[1] - xlims[0]) / x_pixels
     y_per_pixel = (ylims[1] - ylims[0]) / y_pixels
     x = np.array(x)
@@ -92,7 +89,6 @@ def allocate_text(
         scatter_xy=scatterxy,
     )
 
-    # Plot once again
     if draw_lines:
         for x_coord, y_coord, w, h, s, ind in non_overlapping_boxes:
             x_near, y_near = find_nearest_point_on_box(
