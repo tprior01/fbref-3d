@@ -289,11 +289,11 @@ def update(xyz, data, dim, per_min, selected_data, quants, annotation, colour, x
         selected_data = None
     elif annotation == 'quantile':
         quants = [q / 100 for q in quants]
-        o = df[(df['x'] > df['x'].quantile(quants[0])) | (df['y'] > df['y'].quantile(quants[1]))
-               | ((df['x'] > df['x'].quantile(quants[2])) & (df['y'] > df['y'].quantile(quants[2])))]
+        df = df[(df['x'] > df['x'].quantile(quants[0])) | (df['y'] > df['y'].quantile(quants[1]))
+               | ((df['x'] > df['x'].quantile(quants[2])) & (df['y'] > df['y'].quantile(quants[2])))].head(101)
         selected_data = {
-            'points': [{'x': o.loc[i]['x'], 'y': o.loc[i]['y'], 'customdata': [o.loc[i]['name']]} for i in o.index]}
-    if selected_data is not None and selected_data != {'points': []} and plot == scatter and len(selected_data) < 100:
+            'points': [{'x': df.loc[i]['x'], 'y': df.loc[i]['y'], 'customdata': [df.loc[i]['name']]} for i in df.index]}
+    if selected_data is not None and selected_data != {'points': []} and plot == scatter and len(selected_data) <= 100:
         # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
         allocate_text(
             selected_data['points'],
