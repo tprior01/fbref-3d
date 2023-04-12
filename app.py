@@ -5,7 +5,7 @@ from dash import html, dcc, no_update
 from dash.dependencies import Input, Output, State, ClientsideFunction
 from plotly.express import scatter_3d, scatter
 from maps import cat_options, axis_options, seasons, comps, positions, not_per_min, aggregates
-from pandas import read_sql
+from pandas import read_sql, DataFrame
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, false, cast, or_, and_
 from textalloc import allocate_text
@@ -18,12 +18,13 @@ metadata.reflect(engine, only=cat_options.values())
 app = Dash(external_stylesheets=[themes.BOOTSTRAP])
 server = app.server
 
-
 with engine.connect() as conn:
     max_mins = conn.execute(
         text("select max(sum) from (select id, sum(minutes) from playingtime group by (id)) as x")).scalar()
     max_value, max_age = conn.execute(
-        text("select ceiling(max(current_value))::Integer, max(date_part('year', age(dob)))::Integer from player")).all()[0]
+        text(
+            "select ceiling(max(current_value))::Integer, max(date_part('year', age(dob)))::Integer from player")).all()[
+        0]
     clubs = conn.execute(
         text("select distinct club from player where current_value > 20.0 order by club")).scalars().all()
     nations = conn.execute(
@@ -37,6 +38,7 @@ app.layout = Col([
         html.Div(id='x_pixels')
     ], style={'display': 'none'}),
     dcc.Store(id='selected-data'),
+    dcc.Store(id='dataframe'),
     dcc.Markdown('''
         # FBREF-3D
     
@@ -160,34 +162,21 @@ app.layout = Col([
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
     Row([
-        html.Div([dcc.Graph(id='main-plot')]) #, config={'displayModeBar': False})])
+        html.Div([dcc.Graph(id='main-plot')])  # , config={'displayModeBar': False})])
     ])
 ])
 
-
 app.clientside_callback(
     """
-    function(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s) {
+    function(a,b,c,d,e,f,g,h,i) {
         var w = window.innerWidth;
         return w;
     }
     """,
     Output('x_pixels', 'children'),
-    Input('x', 'value'),
-    Input('y', 'value'),
-    Input('z', 'value'),
-    Input('club', 'value'),
-    Input('nation', 'value'),
-    Input('ages', 'value'),
-    Input('values', 'value'),
-    Input('minutes', 'value'),
-    Input('seasons', 'value'),
-    Input('competitions', 'value'),
-    Input('positions', 'value'),
+    Input('dataframe', 'data'),
     Input('colour', 'value'),
     Input('dimension', 'value'),
-    Input('per_min', 'value'),
-    Input('names', 'value'),
     Input('main-plot', 'selectedData'),
     Input('add-only', 'value'),
     Input('x-quantile', 'value'),
@@ -195,6 +184,41 @@ app.clientside_callback(
     Input('xy-quantile', 'value'),
     Input('annotation', 'value')
 )
+
+
+@app.callback(
+    Output('dataframe', 'data'),
+    inputs=[
+        (
+            Input('x', 'value'),
+            Input('y', 'value'),
+            Input('z', 'value'),
+        ),
+        (
+            Input('xcat', 'value'),
+            Input('ycat', 'value'),
+            Input('zcat', 'value'),
+        ),
+        Input('club', 'value'),
+        Input('nation', 'value'),
+        Input('ages', 'value'),
+        Input('values', 'value'),
+        Input('minutes', 'value'),
+        Input('seasons', 'value'),
+        Input('competitions', 'value'),
+        Input('positions', 'value'),
+        Input('names', 'value'),
+        Input('per_min', 'value'),
+        Input('add-only', 'value')
+    ]
+)
+def get_dataframe(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, comps, positions, names, per_min, add):
+    per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
+    query = make_query(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, comps, positions, names, per_min, add)
+    with engine.connect() as conn:
+        df = read_sql(query, con=conn).round({'x': 3, 'y': 3, 'z': 3}).fillna(0)
+        conn.close()
+    return df.to_dict('records')
 
 
 @app.callback(
@@ -207,48 +231,28 @@ app.clientside_callback(
             State('x', 'options'),
             State('y', 'options'),
             State('z', 'options'),
-
         ),
-        (
-            State('xcat', 'value'),
-            State('ycat', 'value'),
-            State('zcat', 'value'),
-        ),
-        State('club', 'value'),
-        State('nation', 'value'),
-        State('ages', 'value'),
-        State('values', 'value'),
-        State('minutes', 'value'),
-        State('seasons', 'value'),
-        State('competitions', 'value'),
-        State('positions', 'value'),
-        State('colour', 'value'),
+        State('dataframe', 'data'),
         State('dimension', 'value'),
         State('per_min', 'value'),
-        State('names', 'value'),
         State('selected-data', 'data'),
-        State('add-only', 'value'),
         (
-            State('x-quantile', 'value'),
-            State('y-quantile', 'value'),
-            State('xy-quantile', 'value'),
+                State('x-quantile', 'value'),
+                State('y-quantile', 'value'),
+                State('xy-quantile', 'value'),
         ),
         State('annotation', 'value'),
+        State('colour', 'value'),
         Input('x_pixels', 'children'),
     ],
     prevent_initial_call=True
 )
-def update(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps,
-           positions, colour, dim, per_min, names, selected_data, add, quants, annotation, x_pixels):
+def update(xyz, data, dim, per_min, selected_data, quants, annotation, colour, x_pixels):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
-    query = make_query(xyz, xyz_cats, club, nationality, ages, values, minutes,
-                       seasons, comps, positions, names, per_min, add)
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
     z_label = [x['label'] for x in xyz[5] if x['value'] == xyz[2]][0]
-    with engine.connect() as conn:
-        df = read_sql(query, con=conn).round({'x': 3, 'y': 3, 'z': 3}).fillna(0)
-        conn.close()
+    df = DataFrame(data)
     graph_params = dict(
         data_frame=df,
         x='x',
