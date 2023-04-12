@@ -248,7 +248,6 @@ def get_dataframe(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, c
     prevent_initial_call=True
 )
 def update(xyz, data, dim, per_min, selected_data, quants, annotation, colour, x_pixels):
-    print('update')
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
