@@ -58,8 +58,8 @@ def allocate_text(
     if y_scatter is not None:
         assert x_scatter is not None
         assert len(y_scatter) == len(x_scatter)
-        x_scatter = np.array(x_scatter)
-        y_scatter = np.array(y_scatter)
+        x_scatter = x_scatter
+        y_scatter = y_scatter
     assert min_distance <= max_distance
     assert min_distance >= margin
 
