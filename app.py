@@ -4,18 +4,22 @@ from dash_bootstrap_components import Col, Row, Card, themes
 from dash import html, dcc, no_update
 from dash.dependencies import Input, Output, State, ClientsideFunction
 from plotly.express import scatter_3d, scatter
-from maps import cat_options, axis_options, seasons, comps, positions, not_per_min, aggregates
+from maps import cat_options, axis_options, seasons, comps, positions, not_per_min, aggregates, combined
 from pandas import read_sql, DataFrame
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, false, cast, or_, and_
 from textalloc import allocate_text
 from sklearn.ensemble import IsolationForest
 from numpy import vectorize
+from dotenv import load_dotenv
+
+load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
 metadata = MetaData()
 metadata.reflect(engine, only=cat_options.values())
+cat_options["Combined"] = "combined"
 
 app = Dash(external_stylesheets=[themes.BOOTSTRAP])
 server = app.server
@@ -53,7 +57,7 @@ app.layout = Col([
             Col([
                 Row([
                     drop_down("xcat", cat_options, "shooting"),
-                    drop_down("x", axis_options["shooting"], "xg")
+                    drop_down("x", axis_options["shooting"], "non_penalty_goals")
                 ])
             ]),
             Col([
@@ -64,8 +68,8 @@ app.layout = Col([
             ]),
             Col([
                 Row([
-                    drop_down("zcat", cat_options, "passing"),
-                    drop_down("z", axis_options["passing"], None)
+                    drop_down("zcat", cat_options, "combined"),
+                    drop_down("z", axis_options["combined"], None)
                 ])
             ])
         ]),
@@ -101,7 +105,7 @@ app.layout = Col([
             ], width=2),
             Col([
                 Row([
-                    dcc.Input(id='outliers', type='number', value=20, size='2', max=50, min=0, step=1)
+                    dcc.Input(id='outliers', type='number', value=25, size='2', max=50, min=0, step=1)
                 ], justify='center')
             ], width=1)
         ]),
@@ -281,8 +285,8 @@ def update(xyz, data, dim, per_min, outliers, annotation, colour, x_pixels):
             preds = isf.fit_predict(df[['x', 'y']])
             df["iso_forest_outliers"] = preds
             df = df[df["iso_forest_outliers"] == -1]
+            df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
         # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
-        df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
         allocate_text(
             df['x'].tolist(),
             df['y'].tolist(),
@@ -325,6 +329,13 @@ def select_clause(sub, table):
 
 
 def data_sub_query(sub, cat, seasons, comps, label):
+    if cat == "combined":
+        return multi_table_sub_query(sub, seasons, comps, label)
+    else:
+        return single_table_sub_query(sub, cat, seasons, comps, label)
+
+
+def single_table_sub_query(sub, cat, seasons, comps, label):
     table = metadata.tables[str(cat)]
     query = select(
         table.c["id"],
@@ -336,6 +347,43 @@ def data_sub_query(sub, cat, seasons, comps, label):
         table.c["comp"].in_(comps)
     ).subquery()
     return query
+
+
+def multi_table_sub_query(sub, seasons, comps, label):
+    v = combined[sub]
+    table1 = metadata.tables[str(v[2])]
+    table2 = metadata.tables[str(v[3])]
+    a = f'{label}a'
+    b = f'{label}b'
+
+    query1 = select(
+        table1.c["id"],
+        func.sum(table1.c[v[0]]).label(a)
+    ).group_by(
+        table1.c["id"]
+    ).where(
+        table1.c["season"].in_(seasons),
+        table1.c["comp"].in_(comps)
+    ).subquery()
+
+    query2 = select(
+        table2.c["id"],
+        func.sum(table2.c[v[1]]).label(b)
+    ).group_by(
+        table2.c["id"]
+    ).where(
+        table2.c["season"].in_(seasons),
+        table2.c["comp"].in_(comps)
+    ).subquery()
+
+    combined_query = select(
+        query1.c["id"],
+        (query1.c[a] + query2.c[b]).label(label)
+    ).join(
+        query2,
+        query1.c["id"] == query2.c["id"]
+    ).subquery()
+    return combined_query
 
 
 def player_sub_query(club, nationality, values, positions, names, add):
