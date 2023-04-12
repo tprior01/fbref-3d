@@ -149,7 +149,7 @@ app.layout = Col([
         ]),
         Row([
             Col([
-                radio_item(id="annotation", options=["quantile", "selection", "none"], value="quantile"),
+                radio_item(id="annotation", options=["quantile", "selection", "none"], value="selection"),
             ]),
             Col([
                 dcc.Input(id='x-quantile', type='number', value=99.6, size='2', max=100.0, min=0.0, step=0.2)
