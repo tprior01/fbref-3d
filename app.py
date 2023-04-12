@@ -293,7 +293,7 @@ def update(xyz, data, dim, per_min, selected_data, quants, annotation, colour, x
                | ((df['x'] > df['x'].quantile(quants[2])) & (df['y'] > df['y'].quantile(quants[2])))].head(101)
         selected_data = {
             'points': [{'x': df.loc[i]['x'], 'y': df.loc[i]['y'], 'customdata': [df.loc[i]['name']]} for i in df.index]}
-    if selected_data is not None and selected_data != {'points': []} and plot == scatter and len(selected_data) <= 100:
+    if selected_data is not None and selected_data != {'points': []} and plot == scatter and len(selected_data['points']) <= 100:
         # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
         allocate_text(
             selected_data['points'],
