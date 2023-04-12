@@ -88,7 +88,7 @@ def allocate_text(
         print("Creating boxes")
     original_boxes = []
 
-    font = ImageFont.truetype('/assets/Arial.ttf', textsize)
+    font = ImageFont.truetype('/assets/arial.ttf', textsize)
 
     text_list = [point['customdata'][0].split(' ')[-1] for point in selected_points]
 
