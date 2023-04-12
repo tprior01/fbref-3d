@@ -9,6 +9,12 @@ from pandas import read_sql, DataFrame
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, false, cast, or_, and_
 from textalloc import allocate_text
+from sklearn.ensemble import IsolationForest
+from dotenv import load_dotenv
+from numpy import vectorize
+
+load_dotenv()
+
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -77,14 +83,18 @@ app.layout = Col([
     ], style={"width": "100%", "height": "50%"}, body=True),
     Card([
         Row([
-            Col(html.Label('scatter type')),
-            Col(html.Label('marker colours')),
-            Col(html.Label('per minute or totals'))
+            Col(Row(html.Label('scatter type'), justify='center'), width=3),
+            Col(Row(html.Label('marker colours'), justify='center'), width=3),
+            Col(Row(html.Label('per minute or totals'), justify='center'), width=3),
+            Col(Row(html.Label('annotation'), justify='center'), width=2),
+            Col(Row(html.Label('no.'), justify='center'), width=1)
         ]),
         Row([
-            Col([Row([radio_item(id="dimension", options={"2D": True, "3D": False}, value=True)])]),
-            Col([Row([radio_item(id="colour", options={"Z-Axis": "z", "Position": "position"}, value="z")])]),
-            Col([Row([radio_item(id="per_min", options={"Per 90": True, "Total": False}, value=True)])])
+            Col([Row([radio_item(id="dimension", options={"2D": True, "3D": False}, value=True)], justify='center')], width=3),
+            Col([Row([radio_item(id="colour", options={"Z-Axis": "z", "Position": "position"}, value="z")], justify='center')], width=3),
+            Col([Row([radio_item(id="per_min", options={"Per 90": True, "Total": False}, value=True)], justify='center')], width=3),
+            Col([Row([radio_item(id="annotation", options=["outliers", "none"], value="outliers")], justify='center')], width=2),
+            Col([Row([dcc.Input(id='outliers', type='number', value=20, size='2', max=50, min=0, step=1)], justify='center')], width=1)
         ]),
     ], style={"width": "100%"}, body=True),
     Card([
@@ -139,29 +149,21 @@ app.layout = Col([
             Col(radio_item(id="add-only", options={"add": True, "only": False}, value=True), width=2),
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
-    Card([
-        Row([
-            Col(html.Label('annotation')),
-            Col(html.Label('x-quantile')),
-            Col(html.Label('y-quantile')),
-            Col(html.Label('xy-quantile')),
-
-        ]),
-        Row([
-            Col([
-                radio_item(id="annotation", options=["quantile", "selection", "none"], value="selection"),
-            ]),
-            Col([
-                dcc.Input(id='x-quantile', type='number', value=99.6, size='2', max=100.0, min=0.0, step=0.2)
-            ]),
-            Col([
-                dcc.Input(id='y-quantile', type='number', value=99.6, size='2', max=100.0, min=0.0, step=0.2)
-            ]),
-            Col([
-                dcc.Input(id='xy-quantile', type='number', value=95, size='2', max=100.0, min=0.0, step=0.2)
-            ]),
-        ]),
-    ], style={"width": "100%", "height": "50%"}, body=True),
+    # Card([
+    #     Row([
+    #         Col(html.Label('annotation')),
+    #         Col(html.Label('number of outliers'))
+    #
+    #     ]),
+    #     Row([
+    #         Col([
+    #             radio_item(id="annotation", options=["outliers", "none"], value="outliers"),
+    #         ]),
+    #         Col([
+    #             dcc.Input(id='outliers', type='number', value=20, size='2', max=50, min=0, step=1)
+    #         ])
+    #     ]),
+    # ], style={"width": "100%", "height": "50%"}, body=True),
     Row([
         html.Div([dcc.Graph(id='main-plot')])  # , config={'displayModeBar': False})])
     ])
@@ -180,9 +182,7 @@ app.clientside_callback(
     Input('dimension', 'value'),
     Input('main-plot', 'selectedData'),
     Input('add-only', 'value'),
-    Input('x-quantile', 'value'),
-    Input('y-quantile', 'value'),
-    Input('xy-quantile', 'value'),
+    Input('outliers', 'value'),
     Input('annotation', 'value')
 )
 
@@ -237,18 +237,14 @@ def get_dataframe(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, c
         State('dimension', 'value'),
         State('per_min', 'value'),
         State('selected-data', 'data'),
-        (
-            State('x-quantile', 'value'),
-            State('y-quantile', 'value'),
-            State('xy-quantile', 'value'),
-        ),
+        State('outliers', 'value'),
         State('annotation', 'value'),
         State('colour', 'value'),
         Input('x_pixels', 'children'),
     ],
     prevent_initial_call=True
 )
-def update(xyz, data, dim, per_min, selected_data, quants, annotation, colour, x_pixels):
+def update(xyz, data, dim, per_min, selected_data, outliers, annotation, colour, x_pixels):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
@@ -285,18 +281,18 @@ def update(xyz, data, dim, per_min, selected_data, quants, annotation, colour, x
         plot = scatter_3d
         graph_params['z'] = 'z'
     fig = plot(**graph_params)
-    if annotation == 'none':
-        selected_data = None
-    elif annotation == 'quantile':
-        quants = [q / 100 for q in quants]
-        df = df[(df['x'] > df['x'].quantile(quants[0])) | (df['y'] > df['y'].quantile(quants[1]))
-               | ((df['x'] > df['x'].quantile(quants[2])) & (df['y'] > df['y'].quantile(quants[2])))].head(101)
-        selected_data = {
-            'points': [{'x': df.loc[i]['x'], 'y': df.loc[i]['y'], 'customdata': [df.loc[i]['name']]} for i in df.index]}
-    if selected_data is not None and selected_data != {'points': []} and plot == scatter and len(selected_data['points']) <= 100:
+    if annotation == 'outliers':
+        isf = IsolationForest(n_estimators=100, random_state=42, contamination=outliers/len(df.index))
+        preds = isf.fit_predict(df[['x', 'y']])
+        df["iso_forest_outliers"] = preds
+        df = df[df["iso_forest_outliers"] == -1]
+        df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
+
         # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
         allocate_text(
-            selected_data['points'],
+            df['x'].tolist(),
+            df['y'].tolist(),
+            df['name'].tolist(),
             fig,
             x_pixels - (53 + 93 + (121 - 93) * (x_pixels - 450) / (1920 - 450)),
             700,
