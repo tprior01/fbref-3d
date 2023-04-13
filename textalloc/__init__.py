@@ -9,22 +9,23 @@ from PIL import ImageFont
 
 
 def allocate_text(
-    x,
-    y,
-    text_list,
-    fig,
-    x_pixels,
-    y_pixels,
-    x_scatter: Union[np.ndarray, List[float]] = None,
-    y_scatter: Union[np.ndarray, List[float]] = None,
-    textsize: int = 10,
-    margin: float = 0.00,
-    min_distance: float = 0.0075,
-    max_distance: float = 0.07,
-    draw_lines: bool = True,
-    linecolor: str = "grey",
-    draw_all: bool = True,
-    nbr_candidates: int = 100,
+        x,
+        y,
+        text_list,
+        x_per_pixel,
+        y_per_pixel,
+        xlims,
+        ylims,
+        x_scatter: Union[np.ndarray, List[float]] = None,
+        y_scatter: Union[np.ndarray, List[float]] = None,
+        textsize: int = 10,
+        margin: float = 0.00,
+        min_distance: float = 0.0025,
+        max_distance: float = 0.07,
+        draw_lines: bool = False,
+        linecolor: str = "grey",
+        draw_all: bool = True,
+        nbr_candidates: int = 100,
 ):
     """Main function of allocating text-boxes in matplotlib plot
     Args:
@@ -42,13 +43,9 @@ def allocate_text(
         draw_all (bool, optional): Draws all texts after allocating as many as possible despit overlap. Defaults to True.
         nbr_candidates (int, optional): Sets the number of candidates used. Defaults to 0.
     """
-    full_fig = fig.full_figure_for_development(warn=False)
-    xlims = full_fig.layout.xaxis.range
-    ylims = full_fig.layout.yaxis.range
 
+    print("we're doing something")
     # Ensure good inputs
-    x_per_pixel = (xlims[1] - xlims[0]) / x_pixels
-    y_per_pixel = (ylims[1] - ylims[0]) / y_pixels
     x = np.array(x)
     y = np.array(y)
     assert len(x) == len(y)
@@ -89,54 +86,57 @@ def allocate_text(
         scatter_xy=scatterxy,
     )
 
-    if draw_lines:
-        for x_coord, y_coord, w, h, s, ind in non_overlapping_boxes:
-            x_near, y_near = find_nearest_point_on_box(
-                x_coord, y_coord, w, h, x[ind], y[ind]
-            )
-            if x_near is not None:
-                fig.add_annotation(
-                    dict(
-                        x=x[ind],
-                        y=y[ind],
-                        ax=x_near,
-                        ay=y_near,
-                        showarrow=True,
-                        arrowcolor=linecolor,
-                        text="",
-                        axref='x',
-                        ayref='y'
-
-                    )
-                )
-    for x_coord, y_coord, w, h, s, ind in non_overlapping_boxes:
-        fig.add_annotation(
-            dict(
-                x=x_coord,
-                y=y_coord,
-                showarrow=False,
-                text=s,
-                font=dict(size=textsize),
-                xshift=w / (2 * x_per_pixel),
-                yshift=h / (2 * y_per_pixel),
-            )
-        )
-
-    if draw_all:
-        for ind in overlapping_boxes_inds:
-            fig.add_annotation(
-                dict(
-                    x=x[ind],
-                    y=y[ind],
-                    showarrow=False,
-                    text=text_list[ind],
-                    font=dict(size=textsize)
-                )
-            )
+    return {(d[0], d[1], d[2]) for d in non_overlapping_boxes}.union(
+        {(x[i], y[i], text_list[i]) for i in overlapping_boxes_inds})
+    #
+    # if draw_lines:
+    #     for x_coord, y_coord, w, h, s, ind in non_overlapping_boxes:
+    #         x_near, y_near = find_nearest_point_on_box(
+    #             x_coord, y_coord, w, h, x[ind], y[ind]
+    #         )
+    #         if x_near is not None:
+    #             fig.add_annotation(
+    #                 dict(
+    #                     x=x[ind],
+    #                     y=y[ind],
+    #                     ax=x_near,
+    #                     ay=y_near,
+    #                     showarrow=True,
+    #                     arrowcolor=linecolor,
+    #                     text="",
+    #                     axref='x',
+    #                     ayref='y'
+    #
+    #                 )
+    #             )
+    # for x_coord, y_coord, w, h, s, ind in non_overlapping_boxes:
+    #     fig.add_annotation(
+    #         dict(
+    #             x=x_coord,
+    #             y=y_coord,
+    #             showarrow=False,
+    #             text=s,
+    #             font=dict(size=textsize),
+    #             xshift=w / (2 * x_per_pixel),
+    #             yshift=h / (2 * y_per_pixel),
+    #         )
+    #     )
+    #
+    # if draw_all:
+    #     for ind in overlapping_boxes_inds:
+    #         fig.add_annotation(
+    #             dict(
+    #                 x=x[ind],
+    #                 y=y[ind],
+    #                 showarrow=False,
+    #                 text=text_list[ind],
+    #                 font=dict(size=textsize)
+    #             )
+    #         )
 
 
 def find_nearest_point_on_box(
-    xmin: float, ymin: float, w: float, h: float, x: float, y: float
+        xmin: float, ymin: float, w: float, h: float, x: float, y: float
 ) -> Tuple[float, float]:
     """Finds nearest point on box from point.
     Returns None,None if point inside box
@@ -175,8 +175,8 @@ def find_nearest_point_on_box(
 
 
 def lines_to_segments(
-    x_lines: List[np.ndarray],
-    y_lines: List[np.ndarray],
+        x_lines: List[np.ndarray],
+        y_lines: List[np.ndarray],
 ) -> np.ndarray:
     """Sets up
     Args:

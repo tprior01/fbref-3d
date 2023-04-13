@@ -10,7 +10,10 @@ from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, false, cast, or_, and_
 from textalloc import allocate_text
 from sklearn.ensemble import IsolationForest
-from numpy import vectorize
+from dotenv import load_dotenv
+from ast import literal_eval
+
+load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -25,18 +28,24 @@ with engine.connect() as conn:
     max_mins = conn.execute(
         text("select max(sum) from (select id, sum(minutes) from playingtime group by (id)) as x")).scalar()
     max_value, max_age = conn.execute(
-        text("select ceiling(max(current_value))::Integer,max(date_part('year',age(dob)))::Integer from player")).all()[0]
+        text("select ceiling(max(current_value))::Integer,max(date_part('year',age(dob)))::Integer from player")).all()[
+        0]
     clubs = conn.execute(
         text("select distinct club from player where current_value > 20.0 order by club")).scalars().all()
     nations = conn.execute(
         text("select distinct nationality from player order by nationality")).scalars().all()
-    names = conn.execute(
+    player_names = conn.execute(
         text("select name from player order by name")).scalars().all()
     conn.close()
 
 app.layout = Col([
-    html.Div([html.Div(id='x_pixels')], style={'display': 'none'}),
+    html.Div([html.Div(id='x-pixels')], style={'display': 'none'}),
+    html.Div([html.Div(id='limits', children='[[-0.06434213122841637,1.0953421312284162],[-0.02614906698770315,0.45114906698770313]]')], style={'display': 'none'}),
+    dcc.Store(id='per-pixel'),
     dcc.Store(id='dataframe'),
+    dcc.Store(id='label-dataframe'),
+    dcc.Store(id='labels'),
+    dcc.Store(id='annotations-added'),
     dcc.Markdown('''
         # FBREF-3D
     
@@ -155,8 +164,9 @@ app.layout = Col([
             Col(html.Label('names')),
         ]),
         Row([
-            Col(dcc.Dropdown(id='names', options=names, value=[], multi=True), width=8),
-            Col(radio_item(id="add-only", options=["add and annotate", "add", "only"], value="add and annotate"), width=4),
+            Col(dcc.Dropdown(id='names', options=player_names, value=[], multi=True), width=8),
+            Col(radio_item(id="add-only", options=["add and annotate", "add", "only"], value="add and annotate"),
+                width=4),
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
     Row([
@@ -166,24 +176,47 @@ app.layout = Col([
 
 app.clientside_callback(
     """
-    function(a,b,c,d,e,f,g,h,i) {
+    function(dataframe) {
         var w = window.innerWidth;
         return w;
     }
     """,
-    Output('x_pixels', 'children'),
-    Input('dataframe', 'data'),
-    Input('colour', 'value'),
-    Input('dimension', 'value'),
-    Input('main-plot', 'selectedData'),
-    Input('add-only', 'value'),
-    Input('outliers', 'value'),
-    Input('annotation', 'value')
+    Output('x-pixels', 'children'),
+    Input('dataframe', 'data')
+)
+
+app.clientside_callback(
+    """
+    function(fig) {
+        const x_range = fig.layout.xaxis.range;
+        const y_range = fig.layout.yaxis.range;
+        return JSON.stringify([x_range, y_range])
+    }
+    """,
+    Output('limits', 'children'),
+    Input('main-plot', 'figure'),
+    prevent_initial_call=True
 )
 
 
 @app.callback(
-    Output('dataframe', 'data'),
+    Output('per-pixel', 'data'),
+    Input('limits', 'children'),
+    State('x-pixels', 'children'),
+    prevent_initial_call=True
+)
+def pixels_per_xy(limits, x_pixels):
+    """Calculates the pixels per x and y range. The no. of pixels on the dynamic x-axis is linearly interpolated."""
+    limits = literal_eval(limits)
+    xlims, ylims = limits[0], limits[1]
+    x_pixels = x_pixels - (53 + 93 + (121 - 93) * (x_pixels - 450) / (1920 - 450))
+    x_per_pixel = (xlims[1] - xlims[0]) / x_pixels
+    y_per_pixel = (ylims[1] - ylims[0]) / 700
+    return x_per_pixel, y_per_pixel
+
+
+@app.callback(
+    Output('dataframe', 'data', allow_duplicate=True),
     inputs=[
         (
             Input('x', 'value'),
@@ -203,44 +236,175 @@ app.clientside_callback(
         Input('seasons', 'value'),
         Input('competitions', 'value'),
         Input('positions', 'value'),
-        Input('names', 'value'),
         Input('per_min', 'value'),
-        Input('add-only', 'value')
-    ]
+        Input('add-only', 'value'),
+        State('outliers', 'value'),
+        State('names', 'value'),
+
+    ],
+    prevent_initial_call=True
 )
-def get_dataframe(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, comps, positions, names, per_min, add):
+def get_dataframe(xyz, tables, club, nation, age, val, mins, season, comp, pos, per_min, add, outliers, names):
+    """Queries the db and stores the results"""
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
-    query = make_query(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, comps, positions, names, per_min, add)
+    query = make_query(xyz, tables, club, nation, age, val, mins, season, comp, pos, names, per_min, add)
     with engine.connect() as conn:
         df = read_sql(query, con=conn).round({'x': 3, 'y': 3, 'z': 3}).fillna(0)
         conn.close()
+    l = len(df.index)
+    isf = IsolationForest(n_estimators=100, random_state=42, contamination=0.5 if outliers / l > 0.5 else outliers / l)
+    preds = isf.fit_predict(df[['x', 'y']])
+    df["iso_forest_outliers"] = preds
     return df.to_dict('records')
+
+
+@app.callback(
+    Output('dataframe', 'data', allow_duplicate=True),
+    inputs=[
+        Input('names', 'value'),
+        State('dataframe', 'data'),
+        (
+            (
+                State('x', 'value'),
+                State('y', 'value'),
+                State('z', 'value'),
+            ),
+            (
+                State('xcat', 'value'),
+                State('ycat', 'value'),
+                State('zcat', 'value'),
+            ),
+            State('club', 'value'),
+            State('nation', 'value'),
+            State('ages', 'value'),
+            State('values', 'value'),
+            State('minutes', 'value'),
+            State('seasons', 'value'),
+            State('competitions', 'value'),
+            State('positions', 'value'),
+            State('per_min', 'value'),
+            State('add-only', 'value'),
+            State('outliers', 'value'),
+        )
+    ],
+    prevent_initial_call=True
+)
+def update_dataframe(names, df, query_params):
+    """Checks if a player is in the stored data, and if not, makes a new query which includes the new player"""
+    if len(names) == 0:
+        return no_update
+    df = DataFrame(df)
+    name = names[-1]
+    if name in df['name']:
+        return no_update
+    else:
+        get_dataframe(*query_params, names)
+
+
+@app.callback(
+    Output('label-dataframe', 'data'),
+    Input('dataframe', 'data'),
+    State('add-only', 'value'),
+    State('annotation', 'value'),
+    State('names', 'value'),
+    prevent_initial_call=True
+)
+def get_outliers(df, add, annotation, names):
+    """Stores the outliers as a separate dataframe"""
+    print('get_outliers')
+    if annotation == 'none':
+        return no_update
+    df = DataFrame(df)
+    l = len(df.index)
+    if l > 50:
+        if add == 'add and annotate':
+            df = df[(df["iso_forest_outliers"] == -1) | df['name'].isin(names)][["x", "y", "name"]]
+        else:
+            df = df[df["iso_forest_outliers"] == -1][["x", "y", "name"]]
+    return df.to_dict('records')
+
+
+@app.callback(
+    Output('labels', 'data'),
+    Input('label-dataframe', 'data'),
+    State('labels', 'data'),
+    State('dataframe', 'data'),
+    State('per-pixel', 'data'),
+    State('limits', 'children'),
+    prevent_initial_call=True
+)
+def process_outliers(df_label, labels, df, per_pixel, limits):
+    """Finds non-overlapping positions only for newly added players"""
+    if per_pixel is None:
+        return no_update
+    limits = literal_eval(limits)
+    df_label = DataFrame(df_label)
+    s1 = {(getattr(row, 'x'), getattr(row, 'y'), getattr(row, 'name').split(' ')[-1]) for row in
+          df_label.itertuples(index=False)}
+    s2 = labels if labels is not None else {}
+    intersection = s1.intersection(s2)
+    difference = s1.difference(s2)
+    new_labels = allocate_text(
+        x=[player[0] for player in difference],
+        y=[player[1] for player in difference],
+        text_list=[player[2] for player in difference],
+        x_per_pixel=per_pixel[0],
+        y_per_pixel=per_pixel[1],
+        xlims=limits[0],
+        ylims=limits[1],
+        x_scatter=list({player['x'] for player in df}.union({player[0] for player in intersection})),
+        y_scatter=list({player['y'] for player in df}.union({player[1] for player in intersection})),
+    )
+    print(new_labels.union(intersection))
+    return new_labels.union(intersection)
+
+
+@app.callback(
+    Output('annotations-added', 'data'),
+    Input('labels', 'data'),
+    State('main-plot', 'figure'),
+    State('per-pixel', 'data'),
+    prevent_initial_call=True
+)
+def add_annotations(labels, fig, per_pixel):
+    print('add_annotations')
+
+    for x, y, w, h, name in labels:
+        fig.add_annotation(
+            dict(
+                x=x,
+                y=y,
+                text=name,
+                showarrow=False,
+                font=dict(size=10),
+                xshift=w / (2 * per_pixel[0]),
+                yshift=h / (2 * per_pixel[1]),
+            )
+        )
+    return 1
 
 
 @app.callback(
     Output('main-plot', 'figure'),
     inputs=[
         (
-            State('x', 'value'),
-            State('y', 'value'),
-            State('z', 'value'),
-            State('x', 'options'),
-            State('y', 'options'),
-            State('z', 'options'),
+                State('x', 'value'),
+                State('y', 'value'),
+                State('z', 'value'),
+                State('x', 'options'),
+                State('y', 'options'),
+                State('z', 'options'),
         ),
-        State('dataframe', 'data'),
+        Input('dataframe', 'data'),
         State('dimension', 'value'),
         State('per_min', 'value'),
-        State('outliers', 'value'),
         State('annotation', 'value'),
         State('colour', 'value'),
-        State('names', 'value'),
-        State('add-only', 'value'),
-        Input('x_pixels', 'children'),
+        State('annotations-added', 'data')
     ],
     prevent_initial_call=True
 )
-def update(xyz, data, dim, per_min, outliers, annotation, colour, names, add, x_pixels):
+def update(xyz, data, dim, per_min, annotation, colour, labels):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
@@ -277,28 +441,17 @@ def update(xyz, data, dim, per_min, outliers, annotation, colour, names, add, x_
         plot = scatter_3d
         graph_params['z'] = 'z'
     fig = plot(**graph_params)
-    if annotation == 'outliers':
-        l = len(df.index)
-        if l > 50:
-            isf = IsolationForest(n_estimators=100, random_state=42, contamination=0.5 if outliers/l > 0.5 else outliers/l)
-            preds = isf.fit_predict(df[['x', 'y']])
-            df["iso_forest_outliers"] = preds
-            if add == 'add and annotate':
-                df = df[(df["iso_forest_outliers"] == -1) | df['name'].isin(names)]
-            else:
-                df = df[df["iso_forest_outliers"] == -1]
-        df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
-        # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
-        allocate_text(
-            df['x'].tolist(),
-            df['y'].tolist(),
-            df['name'].tolist(),
-            fig,
-            x_pixels - (53 + 93 + (121 - 93) * (x_pixels - 450) / (1920 - 450)),
-            700,
-            graph_params['data_frame']['x'].tolist(),
-            graph_params['data_frame']['y'].tolist(),
-        )
+    if annotation == 'outliers' and labels is not None:
+        for label in labels:
+            fig.add_annotation(
+                dict(
+                    x=label[0],
+                    y=label[1],
+                    text=label[2],
+                    font=dict(size=10),
+                    showarrow=False,
+                )
+            )
     fig.update_layout(
         height=700,
         autosize=True,
@@ -522,4 +675,4 @@ def update_z_value(options):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=False, use_reloader=False)
+    app.run_server(debug=True, use_reloader=False)
