@@ -11,12 +11,9 @@ from sqlalchemy import text, create_engine, select, MetaData, func, extract, Int
 from textalloc import get_annotation_data
 from sklearn.ensemble import IsolationForest
 from numpy import vectorize
-from dotenv import load_dotenv
 from ast import literal_eval
 from PIL import ImageFont
 from itertools import starmap
-
-load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -687,4 +684,4 @@ def update_z_value(options):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True, use_reloader=False)
+    app.run_server(debug=False, use_reloader=False)
