@@ -180,9 +180,9 @@ def xy_per_pixel(x_pixels, limits):
     """Calculates the x and y range per pixel. The no. of pixels on the dynamic x-axis is linearly interpolated."""
     limits = literal_eval(limits)
     x_lims, y_lims = limits[0], limits[1]
-    x_pixels = x_pixels - (53 + 93 + (121 - 93) * (x_pixels - 450) / (1920 - 450))
-    x_per_pixel = (x_lims[1] - x_lims[0]) / x_pixels
-    y_per_pixel = (y_lims[1] - y_lims[0]) / 700
+    x_pixels = round(x_pixels - (53 + 93 + (121 - 93) * (x_pixels - 450) / (1920 - 450)))
+    x_per_pixel = round((x_lims[1] - x_lims[0]) / x_pixels, 4)
+    y_per_pixel = round((y_lims[1] - y_lims[0]) / 700, 4)
     return [x_per_pixel, y_per_pixel]
 
 
