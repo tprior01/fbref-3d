@@ -5,35 +5,42 @@ Code adapted from https://github.com/ckjellson/textalloc
 from textalloc.non_overlapping_boxes import get_non_overlapping_boxes
 import numpy as np
 from typing import List, Tuple, Union
-from PIL import ImageFont
 
 
 def allocate_text(
-    x,
-    y,
-    text_list,
-    fig,
-    x_pixels,
-    y_pixels,
-    x_scatter: Union[np.ndarray, List[float]] = None,
-    y_scatter: Union[np.ndarray, List[float]] = None,
-    textsize: int = 10,
-    margin: float = 0.00,
-    min_distance: float = 0.0075,
-    max_distance: float = 0.07,
-    draw_lines: bool = True,
-    linecolor: str = "grey",
-    draw_all: bool = True,
-    nbr_candidates: int = 100,
+        x,
+        y,
+        text_list,
+        fig,
+        x_lims,
+        y_lims,
+        x_per_pixel,
+        y_per_pixel,
+        font,
+        x_scatter: Union[np.ndarray, List[float]] = None,
+        y_scatter: Union[np.ndarray, List[float]] = None,
+        text_size: int = 10,
+        margin: float = 0.00,
+        min_distance: float = 0.0025,
+        max_distance: float = 0.07,
+        draw_lines: bool = True,
+        linecolor: str = "grey",
+        draw_all: bool = True,
+        nbr_candidates: int = 100,
 ):
     """Main function of allocating text-boxes in matplotlib plot
     Args:
+        x: a list of x coordinates for the labels.
+        y: a list of y coordinates for the labels.
+        text_list:  a list of strings for the labels.
         fig (_type_): plotly dash figure.
-        x_pixels (float): width of plot area in pixels.
-        y_pixels (float): height of plot area in pixels.
+        x_lims: the x limits of the plot.
+        y_lims: the y limits of the plot.
+        x_per_pixel: the x range per pixel.
+        y_per_pixel: the y range per pixel.
         x_scatter (Union[np.ndarray, List[float]], optional): x-coordinates of all scattered points in plot 1d array/list. Defaults to None.
         y_scatter (Union[np.ndarray, List[float]], optional): y-coordinates of all scattered points in plot 1d array/list. Defaults to None.
-        textsize (int, optional): size of text. Defaults to 10.
+        text_size (int, optional): size of text. Defaults to 10.
         margin (float, optional): parameter for margins between objects. Increase for larger margins to points and lines. Defaults to 0.01.
         min_distance (float, optional): parameter for min distance between text and origin. Defaults to 0.015.
         max_distance (float, optional): parameter for max distance between text and origin. Defaults to 0.07.
@@ -42,13 +49,7 @@ def allocate_text(
         draw_all (bool, optional): Draws all texts after allocating as many as possible despit overlap. Defaults to True.
         nbr_candidates (int, optional): Sets the number of candidates used. Defaults to 0.
     """
-    full_fig = fig.full_figure_for_development(warn=False)
-    xlims = full_fig.layout.xaxis.range
-    ylims = full_fig.layout.yaxis.range
-
     # Ensure good inputs
-    x_per_pixel = (xlims[1] - xlims[0]) / x_pixels
-    y_per_pixel = (ylims[1] - ylims[0]) / y_pixels
     x = np.array(x)
     y = np.array(y)
     assert len(x) == len(y)
@@ -66,10 +67,8 @@ def allocate_text(
     # Create boxes in original plot
     original_boxes = []
 
-    font = ImageFont.truetype('assets/fonts/arial.ttf', textsize)
-
     for x_coord, y_coord, s in zip(x, y, text_list):
-        w, h = font.getlength(s) * x_per_pixel, textsize * y_per_pixel
+        w, h = font.getlength(s) * x_per_pixel, text_size * y_per_pixel
         original_boxes.append((x_coord, y_coord, w, h, s))
 
     # Process extracted textboxes
@@ -79,8 +78,8 @@ def allocate_text(
         scatterxy = np.transpose(np.vstack([x_scatter, y_scatter]))
     non_overlapping_boxes, overlapping_boxes_inds = get_non_overlapping_boxes(
         original_boxes,
-        xlims,
-        ylims,
+        x_lims,
+        y_lims,
         margin,
         min_distance,
         max_distance,
@@ -89,12 +88,17 @@ def allocate_text(
         scatter_xy=scatterxy,
     )
 
+    lines = set()
+    annotations = set()
+
     if draw_lines:
         for x_coord, y_coord, w, h, s, ind in non_overlapping_boxes:
             x_near, y_near = find_nearest_point_on_box(
                 x_coord, y_coord, w, h, x[ind], y[ind]
             )
             if x_near is not None:
+                lines.add((x[ind], y[ind], x_near, y_near))
+
                 fig.add_annotation(
                     dict(
                         x=x[ind],
@@ -110,13 +114,14 @@ def allocate_text(
                     )
                 )
     for x_coord, y_coord, w, h, s, ind in non_overlapping_boxes:
+        annotations.add((x_coord, y_coord, s, w, h))
         fig.add_annotation(
             dict(
                 x=x_coord,
                 y=y_coord,
                 showarrow=False,
                 text=s,
-                font=dict(size=textsize),
+                font=dict(size=text_size),
                 xshift=w / (2 * x_per_pixel),
                 yshift=h / (2 * y_per_pixel),
             )
@@ -130,13 +135,105 @@ def allocate_text(
                     y=y[ind],
                     showarrow=False,
                     text=text_list[ind],
-                    font=dict(size=textsize)
+                    font=dict(size=text_size)
                 )
             )
 
 
+def get_annotation_data(
+        x,
+        y,
+        text_list,
+        x_lims,
+        y_lims,
+        x_per_pixel,
+        y_per_pixel,
+        font,
+        x_scatter: Union[np.ndarray, List[float]] = None,
+        y_scatter: Union[np.ndarray, List[float]] = None,
+        text_size: int = 10,
+        margin: float = 0.00,
+        min_distance: float = 0.0075,
+        max_distance: float = 0.07,
+        draw_lines: bool = True,
+        draw_all: bool = True,
+        nbr_candidates: int = 100,
+):
+    """Main function of allocating text-boxes in matplotlib plot
+    Args:
+        x: a list of x coordinates for the labels.
+        y: a list of y coordinates for the labels.
+        text_list:  a list of strings for the labels.
+        x_lims: the x limits of the plot.
+        y_lims: the y limits of the plot.
+        x_per_pixel: the x range per pixel.
+        y_per_pixel: the y range per pixel.
+        font: a pillow font object, used to obtain the width of the strings.
+        x_scatter (Union[np.ndarray, List[float]], optional): x-coordinates of all scattered points in plot 1d array/list. Defaults to None.
+        y_scatter (Union[np.ndarray, List[float]], optional): y-coordinates of all scattered points in plot 1d array/list. Defaults to None.
+        text_size (int, optional): size of text. Defaults to 10.
+        margin (float, optional): parameter for margins between objects. Increase for larger margins to points and lines. Defaults to 0.01.
+        min_distance (float, optional): parameter for min distance between text and origin. Defaults to 0.015.
+        max_distance (float, optional): parameter for max distance between text and origin. Defaults to 0.07.
+        draw_all (bool, optional): Draws all texts after allocating as many as possible despit overlap. Defaults to True.
+        nbr_candidates (int, optional): Sets the number of candidates used. Defaults to 0.
+    """
+    # Ensure good inputs
+    x = np.array(x)
+    y = np.array(y)
+    assert len(x) == len(y)
+
+    if x_scatter is not None:
+        assert y_scatter is not None
+    if y_scatter is not None:
+        assert x_scatter is not None
+        assert len(y_scatter) == len(x_scatter)
+        x_scatter = x_scatter
+        y_scatter = y_scatter
+    assert min_distance <= max_distance
+    assert min_distance >= margin
+
+    # Create boxes in original plot
+    original_boxes = []
+
+    for x_coord, y_coord, string in zip(x, y, text_list):
+        w, h = font.getlength(string) * x_per_pixel, text_size * y_per_pixel
+        original_boxes.append((x_coord, y_coord, w, h, string))
+
+    # Process extracted textboxes
+    if x_scatter is None:
+        scatterxy = None
+    else:
+        scatterxy = np.transpose(np.vstack([x_scatter, y_scatter]))
+    non_overlapping_boxes, overlapping_boxes_inds = get_non_overlapping_boxes(
+        original_boxes,
+        x_lims,
+        y_lims,
+        margin,
+        min_distance,
+        max_distance,
+        nbr_candidates,
+        draw_all,
+        scatter_xy=scatterxy,
+    )
+
+    lines = set()
+    if draw_lines:
+        for x_coord, y_coord, w, h, string, ind in non_overlapping_boxes:
+            x_near, y_near = find_nearest_point_on_box(
+                x_coord, y_coord, w, h, x[ind], y[ind]
+            )
+            if x_near is not None:
+                lines.add((x[ind], y[ind], x_near, y_near))
+
+    annotations = set()
+    for x_coord, y_coord, width, height, string, ind in non_overlapping_boxes:
+        annotations.add((x_coord, y_coord, string, width, height))
+    return annotations, lines
+
+
 def find_nearest_point_on_box(
-    xmin: float, ymin: float, w: float, h: float, x: float, y: float
+        xmin: float, ymin: float, w: float, h: float, x: float, y: float
 ) -> Tuple[float, float]:
     """Finds nearest point on box from point.
     Returns None,None if point inside box
@@ -175,8 +272,8 @@ def find_nearest_point_on_box(
 
 
 def lines_to_segments(
-    x_lines: List[np.ndarray],
-    y_lines: List[np.ndarray],
+        x_lines: List[np.ndarray],
+        y_lines: List[np.ndarray],
 ) -> np.ndarray:
     """Sets up
     Args:
