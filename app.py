@@ -52,8 +52,8 @@ app.layout = Col([
         # FBREF-3D
     
         A dashboard to visualise the data on fbref.com as 2D or 3D scatter graphs. The data is periodically scraped and 
-        added to a PostgreSQL database. Annotations are automatically adjusted to avoid overlapping, which can take a 
-        few seconds to process. The number of annotations is limited to 50.
+        added to a PostgreSQL database. Outliers are annotated and automatically adjusted to avoid overlapping. Find me 
+        on linkedin [here](https://www.linkedin.com/in/thomas-c-prior/).
         '''),
     Card([
         Row([
