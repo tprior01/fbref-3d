@@ -1,16 +1,23 @@
 from widgets import radio_item, drop_down, check_list, range_slider
-from dash import Dash
+from dash import Dash, html, dcc, no_update
 from dash_bootstrap_components import Col, Row, Card, themes
-from dash import html, dcc, no_update
-from dash.dependencies import Input, Output, State, ClientsideFunction
+from dash.dependencies import Input, Output, State
+from plotly.graph_objs import Figure
 from plotly.express import scatter_3d, scatter
-from maps import cat_options, axis_options, seasons, comps, positions, not_per_min, aggregates, combined
+from maps import intial_label_data, cat_options, axis_options, season_map, comp_map, position_list, not_per_min, aggregates, combined
 from pandas import read_sql, DataFrame
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, false, cast, or_, and_
-from textalloc import allocate_text
+from textalloc import get_annotation_data
 from sklearn.ensemble import IsolationForest
 from numpy import vectorize
+from dotenv import load_dotenv
+from ast import literal_eval
+from PIL import ImageFont
+from itertools import starmap
+
+
+load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -21,22 +28,31 @@ cat_options["Combined"] = "combined"
 app = Dash(external_stylesheets=[themes.BOOTSTRAP])
 server = app.server
 
+font = ImageFont.truetype('assets/fonts/arial.ttf', 10)
+
 with engine.connect() as conn:
     max_mins = conn.execute(
         text("select max(sum) from (select id, sum(minutes) from playingtime group by (id)) as x")).scalar()
     max_value, max_age = conn.execute(
-        text("select ceiling(max(current_value))::Integer,max(date_part('year',age(dob)))::Integer from player")).all()[0]
+        text("select ceiling(max(current_value))::Integer,max(date_part('year',age(dob)))::Integer from player")).all()[
+        0]
     clubs = conn.execute(
         text("select distinct club from player where current_value > 20.0 order by club")).scalars().all()
     nations = conn.execute(
         text("select distinct nationality from player order by nationality")).scalars().all()
-    names = conn.execute(
+    all_names = conn.execute(
         text("select name from player order by name")).scalars().all()
     conn.close()
 
 app.layout = Col([
-    html.Div([html.Div(id='x_pixels')], style={'display': 'none'}),
+    html.Div([html.Div(id='x-pixels')], style={'display': 'none'}),
+    html.Div([html.Div(id='limits',
+                       children='[[-0.06434213122841637,1.0953421312284162],[-0.02614906698770315,0.45114906698770313]]')],
+             style={'display': 'none'}),
     dcc.Store(id='dataframe'),
+    dcc.Store(id='per-pixel'),
+    dcc.Store(id='label-dataframe', data=intial_label_data),
+    dcc.Store(id='labels'),
     dcc.Markdown('''
         # FBREF-3D
     
@@ -65,8 +81,8 @@ app.layout = Col([
             ]),
             Col([
                 Row([
-                    drop_down("zcat", cat_options, "combined"),
-                    drop_down("z", axis_options["combined"], None)
+                    drop_down("zcat", cat_options, "possession"),
+                    drop_down("z", axis_options["possession"], None)
                 ])
             ])
         ]),
@@ -97,7 +113,7 @@ app.layout = Col([
             ], width=3),
             Col([
                 Row([
-                    radio_item(id="annotation", options=["outliers", "none"], value="outliers")
+                    radio_item(id="annotation", options={"outliers": True, "none": False}, value=True)
                 ], justify='center')
             ], width=2),
             Col([
@@ -111,15 +127,15 @@ app.layout = Col([
         Row([
             Col([
                 Row(html.Label('seasons')),
-                Row(check_list("seasons", seasons)),
+                Row(check_list("seasons", season_map)),
             ]),
             Col([
                 Row(html.Label('competitions')),
-                Row(check_list("competitions", comps)),
+                Row(check_list("competitions", comp_map)),
             ]),
             Col([
                 Row(html.Label('positions')),
-                Row(check_list("positions", positions)),
+                Row(check_list("positions", position_list)),
             ])
         ])
     ], style={"width": "100%"}, body=True),
@@ -155,8 +171,9 @@ app.layout = Col([
             Col(html.Label('names')),
         ]),
         Row([
-            Col(dcc.Dropdown(id='names', options=names, value=[], multi=True), width=8),
-            Col(radio_item(id="add-only", options=["add and annotate", "add", "only"], value="add and annotate"), width=4),
+            Col(dcc.Dropdown(id='names', options=all_names, value=[], multi=True), width=8),
+            Col(radio_item(id="add-only", options={"add and annotate": True, "add": False}, value=True),
+                width=4),
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
     Row([
@@ -166,34 +183,62 @@ app.layout = Col([
 
 app.clientside_callback(
     """
-    function(a,b,c,d,e,f,g,h,i) {
+    function(dataframe) {
         var w = window.innerWidth;
         return w;
     }
     """,
-    Output('x_pixels', 'children'),
-    Input('dataframe', 'data'),
-    Input('colour', 'value'),
-    Input('dimension', 'value'),
-    Input('main-plot', 'selectedData'),
-    Input('add-only', 'value'),
-    Input('outliers', 'value'),
-    Input('annotation', 'value')
+    Output('x-pixels', 'children'),
+    Input('limits', 'children')
+)
+
+app.clientside_callback(
+    """
+    function(fig, dim) {
+        if (!dim) {
+                return window.dash_clientside.no_update
+        } else {
+                const x_range = fig.layout.xaxis.range;
+                const y_range = fig.layout.yaxis.range;
+                return JSON.stringify([x_range, y_range])
+        }
+    }
+    """,
+    Output('limits', 'children'),
+    Input('main-plot', 'figure'),
+    State('dimension', 'value'),
+    prevent_initial_call=True
 )
 
 
 @app.callback(
-    Output('dataframe', 'data'),
+    Output('per-pixel', 'data'),
+    Input('x-pixels', 'children'),
+    State('limits', 'children'),
+    prevent_initial_call=True
+)
+def xy_per_pixel(x_pixels, limits):
+    """Calculates the x and y range per pixel. The no. of pixels on the dynamic x-axis is linearly interpolated."""
+    limits = literal_eval(limits)
+    x_lims, y_lims = limits[0], limits[1]
+    x_pixels = x_pixels - (53 + 93 + (121 - 93) * (x_pixels - 450) / (1920 - 450))
+    x_per_pixel = (x_lims[1] - x_lims[0]) / x_pixels
+    y_per_pixel = (y_lims[1] - y_lims[0]) / 700
+    return [x_per_pixel, y_per_pixel]
+
+
+@app.callback(
+    Output('dataframe', 'data', allow_duplicate=True),
     inputs=[
         (
-            Input('x', 'value'),
-            Input('y', 'value'),
-            Input('z', 'value'),
+                Input('x', 'value'),
+                Input('y', 'value'),
+                Input('z', 'value'),
         ),
         (
-            Input('xcat', 'value'),
-            Input('ycat', 'value'),
-            Input('zcat', 'value'),
+                Input('xcat', 'value'),
+                Input('ycat', 'value'),
+                Input('zcat', 'value'),
         ),
         Input('club', 'value'),
         Input('nation', 'value'),
@@ -203,48 +248,95 @@ app.clientside_callback(
         Input('seasons', 'value'),
         Input('competitions', 'value'),
         Input('positions', 'value'),
-        Input('names', 'value'),
         Input('per_min', 'value'),
-        Input('add-only', 'value')
-    ]
+        Input('outliers', 'value'),
+        State('names', 'value'),
+        Input('annotation', 'value')
+    ],
+    prevent_initial_call=True
 )
-def get_dataframe(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, comps, positions, names, per_min, add):
+def get_dataframe(xyz, xyz_cats, club, nation, ages, values, mins, seasons, comps, positions, per_min, outliers, names, annotation):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
-    query = make_query(xyz, xyz_cats, club, nation, ages, values, minutes, seasons, comps, positions, names, per_min, add)
+    query = make_query(xyz, xyz_cats, club, nation, ages, values, mins, seasons, comps, positions, names, per_min)
     with engine.connect() as conn:
         df = read_sql(query, con=conn).round({'x': 3, 'y': 3, 'z': 3}).fillna(0)
         conn.close()
+    if not annotation:
+        df["iso_forest_outliers"] = 1
+    else:
+        l = len(df.index)
+        isf = IsolationForest(n_estimators=100, random_state=42, contamination=0.5 if outliers / l > 0.5 else outliers / l)
+        preds = isf.fit_predict(df[['x', 'y']])
+        df["iso_forest_outliers"] = preds
     return df.to_dict('records')
 
 
 @app.callback(
-    Output('main-plot', 'figure'),
+    Output('dataframe', 'data', allow_duplicate=True),
     inputs=[
-        (
-            State('x', 'value'),
-            State('y', 'value'),
-            State('z', 'value'),
-            State('x', 'options'),
-            State('y', 'options'),
-            State('z', 'options'),
-        ),
+        Input('names', 'value'),
         State('dataframe', 'data'),
-        State('dimension', 'value'),
-        State('per_min', 'value'),
-        State('outliers', 'value'),
-        State('annotation', 'value'),
-        State('colour', 'value'),
-        State('names', 'value'),
-        State('add-only', 'value'),
-        Input('x_pixels', 'children'),
+        (
+            (
+                State('x', 'value'),
+                State('y', 'value'),
+                State('z', 'value'),
+            ),
+            (
+                State('xcat', 'value'),
+                State('ycat', 'value'),
+                State('zcat', 'value'),
+            ),
+            State('club', 'value'),
+            State('nation', 'value'),
+            State('ages', 'value'),
+            State('values', 'value'),
+            State('minutes', 'value'),
+            State('seasons', 'value'),
+            State('competitions', 'value'),
+            State('positions', 'value'),
+            State('per_min', 'value'),
+            State('outliers', 'value'),
+        )
     ],
     prevent_initial_call=True
 )
-def update(xyz, data, dim, per_min, outliers, annotation, colour, names, add, x_pixels):
+def update_dataframe_with_name(names, df, query_params):
+    """Checks if a player is in the stored data, and if not, makes a new query which includes the new player"""
+    if len(names) == 0:
+        return no_update
+    df = DataFrame(df)
+    name = names[-1]
+    if name in df['name'].values:
+        return no_update
+    else:
+        get_dataframe(*query_params, names)
+
+
+@app.callback(
+    Output('main-plot', 'figure', allow_duplicate=True),
+    inputs=[
+        (
+                State('x', 'value'),
+                State('y', 'value'),
+                State('z', 'value'),
+                State('x', 'options'),
+                State('y', 'options'),
+                State('z', 'options'),
+        ),
+        Input('dataframe', 'data'),
+        Input('dimension', 'value'),
+        State('per_min', 'value'),
+        Input('colour', 'value'),
+    ],
+    prevent_initial_call=True
+)
+def get_figure(xyz, data, dim, per_min, colour):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
     z_label = [x['label'] for x in xyz[5] if x['value'] == xyz[2]][0]
+
     df = DataFrame(data)
     graph_params = dict(
         data_frame=df,
@@ -277,28 +369,6 @@ def update(xyz, data, dim, per_min, outliers, annotation, colour, names, add, x_
         plot = scatter_3d
         graph_params['z'] = 'z'
     fig = plot(**graph_params)
-    if annotation == 'outliers':
-        l = len(df.index)
-        if l > 50:
-            isf = IsolationForest(n_estimators=100, random_state=42, contamination=0.5 if outliers/l > 0.5 else outliers/l)
-            preds = isf.fit_predict(df[['x', 'y']])
-            df["iso_forest_outliers"] = preds
-            if add == 'add and annotate':
-                df = df[(df["iso_forest_outliers"] == -1) | df['name'].isin(names)]
-            else:
-                df = df[df["iso_forest_outliers"] == -1]
-        df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
-        # the right margin width is linearly interpolated and subtracted from the screen width (x_pixels)
-        allocate_text(
-            df['x'].tolist(),
-            df['y'].tolist(),
-            df['name'].tolist(),
-            fig,
-            x_pixels - (53 + 93 + (121 - 93) * (x_pixels - 450) / (1920 - 450)),
-            700,
-            graph_params['data_frame']['x'].tolist(),
-            graph_params['data_frame']['y'].tolist(),
-        )
     fig.update_layout(
         height=700,
         autosize=True,
@@ -319,6 +389,140 @@ def update(xyz, data, dim, per_min, outliers, annotation, colour, names, add, x_
         )
     )
     return fig
+
+
+@app.callback(
+    Output('label-dataframe', 'data'),
+    Input('dataframe', 'data'),
+    Input('add-only', 'value'),
+    Input('annotation', 'value'),
+    Input('names', 'value'),
+    Input('per-pixel', 'data'),
+    prevent_initial_call=True
+)
+def get_outliers(df, add, annotation, names, per_pixel):
+    """Stores the outliers as a separate dataframe"""
+    if not annotation or per_pixel is None or df is None:
+        return no_update
+    df = DataFrame(df)
+    l = len(df.index)
+    if l > 50:
+        if add:
+            df = df[(df["iso_forest_outliers"] == -1) | df['name'].isin(names)][["x", "y", "name"]]
+        else:
+            df = df[df["iso_forest_outliers"] == -1][["x", "y", "name"]]
+    if len(df.index) > 0:
+        df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
+    return df.to_dict('records')
+
+
+@app.callback(
+    Output('labels', 'data'),
+    Input('label-dataframe', 'data'),
+    State('labels', 'data'),
+    State('dataframe', 'data'),
+    State('per-pixel', 'data'),
+    State('limits', 'children'),
+    Input('dimension', 'value'),
+    prevent_initial_call=True
+)
+def process_outliers(df_annotation, annotations, df, per_pixel, limits, dim):
+    """Finds non-overlapping positions only for newly added players"""
+    if per_pixel is None or df is None or not dim:
+        return no_update
+    if annotations is None:
+        old_labels, old_arrows = {}, {}
+    else:
+        old_labels = set(starmap(list_to_tuple, annotations[0]))
+        old_arrows = set(starmap(list_to_tuple, annotations[1]))
+    x_per_pixel, y_per_pixel = per_pixel[0], per_pixel[1]
+    limits = literal_eval(limits)
+    df_annotation = DataFrame(df_annotation)
+    new_labels = set()
+    new_arrows = set()
+    for row in df_annotation.itertuples(index=False):
+        x = getattr(row, 'x')
+        y = getattr(row, 'y')
+        string = getattr(row, 'name')
+        width = x + font.getlength(string)
+        new_labels.add((x, y, string, width, 12))
+        new_arrows.add((x, y))
+    labels_intersection = new_labels.intersection(old_labels)
+    labels_difference = new_labels.difference(old_labels)
+
+    add_x_data = []
+    add_y_data = []
+    vshift = 5 * y_per_pixel
+    for point in labels_intersection:
+        add_x_data.extend([point[0], point[0] + font.getlength(point[2]) * x_per_pixel])
+        add_y_data.extend([point[1] + vshift, point[1] - vshift])
+    x_scatter = [player['x'] for player in df]
+    y_scatter = [player['y'] for player in df]
+    x_scatter.extend(add_x_data)
+    y_scatter.extend(add_y_data)
+
+    label_data, arrow_data = get_annotation_data(
+        x=[player[0] for player in labels_difference],
+        y=[player[1] for player in labels_difference],
+        text_list=[player[2] for player in labels_difference],
+        x_lims=limits[0],
+        y_lims=limits[1],
+        x_per_pixel=per_pixel[0],
+        y_per_pixel=per_pixel[1],
+        font=font,
+        x_scatter=x_scatter,
+        y_scatter=y_scatter
+    )
+    new_arrow_coords = {(arrow[0], arrow[1]) for arrow in arrow_data}
+    arrows_intersection = {arrow for arrow in old_arrows if (arrow[0], arrow[1]) in new_arrows and (arrow[0], arrow[1]) not in new_arrow_coords}
+    return [list(label_data.union(labels_intersection)), list(arrow_data.union(arrows_intersection))]
+
+
+@app.callback(
+    Output('main-plot', 'figure', allow_duplicate=True),
+    State('main-plot', 'figure'),
+    State('per-pixel', 'data'),
+    Input('labels', 'data'),
+    State('dimension', 'value'),
+    prevent_initial_call=True
+)
+def add_annotations(fig, per_pixel, annotations, dim):
+    if not dim:
+        return no_update
+    fig = Figure(fig)
+    labels, arrows = annotations[0], annotations[1]
+    for label in labels:
+        fig.add_annotation(
+            dict(
+                x=label[0],
+                y=label[1],
+                showarrow=False,
+                text=label[2],
+                font=dict(size=10),
+                xshift=label[3] / (2 * per_pixel[0]),
+                yshift=label[4] / (2 * per_pixel[1]),
+            )
+        )
+    for arrow in arrows:
+        fig.add_annotation(
+            dict(
+                x=arrow[0],
+                y=arrow[1],
+                ax=arrow[2],
+                ay=arrow[3],
+                showarrow=True,
+                arrowcolor='grey',
+                text="",
+                axref='x',
+                ayref='y'
+
+            )
+        )
+    return fig
+
+
+def list_to_tuple(*args):
+    return tuple(args)
 
 
 def select_clause(sub, table):
@@ -388,7 +592,7 @@ def multi_table_sub_query(sub, seasons, comps, label):
     return combined_query
 
 
-def player_sub_query(club, nationality, values, positions, names, add):
+def player_sub_query(club, nationality, values, positions, names):
     player = metadata.tables["player"]
     query = select(
         player.c["id"],
@@ -408,7 +612,6 @@ def player_sub_query(club, nationality, values, positions, names, add):
             ),
             (player.c['name'].in_(names) if names != [] else false()),
         )
-        if add == 'add' or add == 'add and annotate' else player.c['name'].in_(names),
     ).subquery()
     return query
 
@@ -427,8 +630,8 @@ def mins_sub_query(seasons, comps):
     return query
 
 
-def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, names, per_min, add):
-    player = player_sub_query(club, nationality, values, positions, names, add)
+def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, names, per_min):
+    player = player_sub_query(club, nationality, values, positions, names)
     x = data_sub_query(xyz[0], xyz_cats[0], seasons, comps, 'x')
     y = data_sub_query(xyz[1], xyz_cats[1], seasons, comps, 'y')
     z = data_sub_query(xyz[2], xyz_cats[2], seasons, comps, 'z')
@@ -522,4 +725,4 @@ def update_z_value(options):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=False, use_reloader=False)
+    app.run_server(debug=True, use_reloader=False)
