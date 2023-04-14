@@ -16,7 +16,6 @@ from ast import literal_eval
 from PIL import ImageFont
 from itertools import starmap
 
-
 load_dotenv()
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
@@ -34,8 +33,7 @@ with engine.connect() as conn:
     max_mins = conn.execute(
         text("select max(sum) from (select id, sum(minutes) from playingtime group by (id)) as x")).scalar()
     max_value, max_age = conn.execute(
-        text("select ceiling(max(current_value))::Integer,max(date_part('year',age(dob)))::Integer from player")).all()[
-        0]
+        text("select ceiling(max(current_value))::Integer,max(date_part('year',age(dob)))::Integer from player")).all()[0]
     clubs = conn.execute(
         text("select distinct club from player where current_value > 20.0 order by club")).scalars().all()
     nations = conn.execute(
@@ -47,8 +45,8 @@ with engine.connect() as conn:
 app.layout = Col([
     html.Div([html.Div(id='x-pixels')], style={'display': 'none'}),
     html.Div([html.Div(id='limits',
-                       children='[[-0.06434213122841637,1.0953421312284162],[-0.02614906698770315,0.45114906698770313]]')],
-             style={'display': 'none'}),
+                       children='''[[-0.06434213122841637,1.0953421312284162],
+                                   [-0.02614906698770315,0.45114906698770313]]''')], style={'display': 'none'}),
     dcc.Store(id='dataframe'),
     dcc.Store(id='per-pixel'),
     dcc.Store(id='label-dataframe', data=intial_label_data),
@@ -68,24 +66,18 @@ app.layout = Col([
         ]),
         Row([
             Col([
-                Row([
-                    drop_down("xcat", cat_options, "shooting"),
-                    drop_down("x", axis_options["shooting"], "non_penalty_goals")
-                ])
+                drop_down("xcat", cat_options, "shooting"),
+                drop_down("x", axis_options["shooting"], "non_penalty_goals")
             ]),
             Col([
-                Row([
-                    drop_down("ycat", cat_options, "passing"),
-                    drop_down("y", axis_options["passing"], "xa")
-                ])
+                drop_down("ycat", cat_options, "passing"),
+                drop_down("y", axis_options["passing"], "xa")
             ]),
             Col([
-                Row([
-                    drop_down("zcat", cat_options, "possession"),
-                    drop_down("z", axis_options["possession"], None)
-                ])
+                drop_down("zcat", cat_options, "possession"),
+                drop_down("z", axis_options["possession"], None)
             ])
-        ]),
+        ])
     ], style={"width": "100%", "height": "50%"}, body=True),
     Card([
         Row([
@@ -96,31 +88,11 @@ app.layout = Col([
             Col(Row(html.Label('no.'), justify='center'), width=1)
         ]),
         Row([
-            Col([
-                Row([
-                    radio_item(id="dimension", options={"2D": True, "3D": False}, value=True)
-                ], justify='center')
-            ], width=3),
-            Col([
-                Row([
-                    radio_item(id="colour", options={"Z-Axis": "z", "Position": "position"}, value="z")
-                ], justify='center')
-            ], width=3),
-            Col([
-                Row([
-                    radio_item(id="per_min", options={"Per 90": True, "Total": False}, value=True)
-                ], justify='center')
-            ], width=3),
-            Col([
-                Row([
-                    radio_item(id="annotation", options={"outliers": True, "none": False}, value=True)
-                ], justify='center')
-            ], width=2),
-            Col([
-                Row([
-                    dcc.Input(id='outliers', type='number', value=25, size='2', max=50, min=0, step=1)
-                ], justify='center')
-            ], width=1)
+            Col(Row(radio_item(id="dimension", options={"2D": True, "3D": False}, value=True), justify='center'), width=3),
+            Col(Row(radio_item(id="colour", options={"Z-Axis": "z", "Position": "position"}, value="z"), justify='center'), width=3),
+            Col(Row(radio_item(id="per_min", options={"Per 90": True, "Total": False}, value=True), justify='center'), width=3),
+            Col(Row(radio_item(id="annotation", options={"outliers": True, "none": False}, value=True), justify='center'), width=2),
+            Col(Row(dcc.Input(id='outliers', type='number', value=25, size='2', max=50, min=0, step=1), justify='center'), width=1)
         ]),
     ], style={"width": "100%"}, body=True),
     Card([
@@ -139,7 +111,6 @@ app.layout = Col([
             ])
         ])
     ], style={"width": "100%"}, body=True),
-
     Card([
         Row([
             Col(html.Label('age')),
@@ -147,9 +118,9 @@ app.layout = Col([
             Col(html.Label('minutes'))
         ]),
         Row([
-            Col([Row([range_slider("ages", 15, max_age, 15, max_age, 1)])]),
-            Col([Row([range_slider("values", 0, max_value, 0, max_value, 1)])]),
-            Col([Row([range_slider("minutes", 0, max_mins, 1250, max_mins, 100)])])
+            Col(Row(range_slider("ages", 15, max_age, 15, max_age, 1))),
+            Col(Row(range_slider("values", 0, max_value, 0, max_value, 1))),
+            Col(Row(range_slider("minutes", 0, max_mins, 1250, max_mins, 100)))
         ]),
     ], style={"width": "100%"}, body=True),
     Card([
@@ -158,27 +129,18 @@ app.layout = Col([
             Col(html.Label('club')),
         ]),
         Row([
-            Col([
-                drop_down("nation", ['All'] + nations, "All"),
-            ]),
-            Col([
-                drop_down("club", ['All'] + clubs, "All"),
-            ]),
+            Col(drop_down("nation", ['All'] + nations, "All")),
+            Col(drop_down("club", ['All'] + clubs, "All")),
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
     Card([
+        Row(Col(html.Label('names'))),
         Row([
-            Col(html.Label('names')),
-        ]),
-        Row([
-            Col(dcc.Dropdown(id='names', options=all_names, value=[], multi=True), width=8),
-            Col(radio_item(id="add-only", options={"add and annotate": True, "add": False}, value=True),
-                width=4),
+            Col(dcc.Dropdown(id='names', options=all_names, value=[], multi=True), width=9),
+            Col(radio_item(id="add-only", options={"add and annotate": True, "add": False}, value=True), width=3),
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
-    Row([
-        html.Div([dcc.Graph(id='main-plot', config={'displayModeBar': False})])
-    ])
+    Row(html.Div([dcc.Graph(id='main-plot', config={'displayModeBar': False})]))
 ])
 
 app.clientside_callback(
@@ -231,14 +193,14 @@ def xy_per_pixel(x_pixels, limits):
     Output('dataframe', 'data', allow_duplicate=True),
     inputs=[
         (
-                Input('x', 'value'),
-                Input('y', 'value'),
-                Input('z', 'value'),
+            Input('x', 'value'),
+            Input('y', 'value'),
+            Input('z', 'value'),
         ),
         (
-                Input('xcat', 'value'),
-                Input('ycat', 'value'),
-                Input('zcat', 'value'),
+            Input('xcat', 'value'),
+            Input('ycat', 'value'),
+            Input('zcat', 'value'),
         ),
         Input('club', 'value'),
         Input('nation', 'value'),
@@ -317,12 +279,12 @@ def update_dataframe_with_name(names, df, query_params):
     Output('main-plot', 'figure', allow_duplicate=True),
     inputs=[
         (
-                State('x', 'value'),
-                State('y', 'value'),
-                State('z', 'value'),
-                State('x', 'options'),
-                State('y', 'options'),
-                State('z', 'options'),
+            State('x', 'value'),
+            State('y', 'value'),
+            State('z', 'value'),
+            State('x', 'options'),
+            State('y', 'options'),
+            State('z', 'options'),
         ),
         Input('dataframe', 'data'),
         Input('dimension', 'value'),
