@@ -1,6 +1,6 @@
 from sqlalchemy import Numeric
 
-seasons = {
+season_map = {
     "2022-23": 23,
     "2021-22": 22,
     "2020-21": 21,
@@ -8,7 +8,7 @@ seasons = {
     "2018-19": 19,
     "2017-18": 18}
 
-comps = {
+comp_map = {
     "Premier League": "ENG",
     "Serie A": "ITA", "Bundesliga": "GER",
     "La Liga": "SPA",
@@ -29,21 +29,7 @@ cat_options = {
     "Keepers Advanced": "keepersadv"
 }
 
-cat_options2 = {
-    "Combined": "combined",
-    "Shooting": "shooting",
-    "Passing": "passing",
-    "Pass Types": "passing_types",
-    "Shot Creation": "gca",
-    "Possession": "possession",
-    "Defense": "defense",
-    "Miscellaneous": "misc",
-    "Playing Time": "playingtime",
-    "Keepers": "keepers",
-    "Keepers Advanced": "keepersadv"
-}
-
-positions = [
+position_list = [
     "Goalkeeper",
     "Centre-Back",
     "Full-Back",
@@ -121,7 +107,7 @@ axis_options = {
         {
             "Non Penalty Goals + xA": 'non_penalty_goals_and_xa',
             "npxG + xA": "npxg_and_xa",
-            "Non Penalty Goals + ": 'non_penalty_goals_and_assists'
+            "Non Penalty Goals + Assists": 'non_penalty_goals_and_assists'
         },
     "shooting":
         {
@@ -325,3 +311,29 @@ axis_options = {
             'Goal Kicks Launched': 'goal_kicks_launched'
         }
 }
+
+intial_label_data = [{'x': 0.344, 'y': 0.312, 'name': 'Robben'},
+                     {'x': 0.32, 'y': 0.382, 'name': 'Müller'},
+                     {'x': 0.56, 'y': 0.361, 'name': 'Neymar'},
+                     {'x': 0.596, 'y': 0.21, 'name': 'Salah'},
+                     {'x': 0.339, 'y': 0.386, 'name': 'María'},
+                     {'x': 0.73, 'y': 0.168, 'name': 'Agüero'},
+                     {'x': 0.196, 'y': 0.35, 'name': 'Payet'},
+                     {'x': 1.031, 'y': 0.133, 'name': 'Haaland'},
+                     {'x': 0.291, 'y': 0.373, 'name': 'Bruyne'},
+                     {'x': 0.307, 'y': 0.334, 'name': 'Dembélé'},
+                     {'x': 0.791, 'y': 0.285, 'name': 'Mbappé'},
+                     {'x': 0.476, 'y': 0.32, 'name': 'Iličić'},
+                     {'x': 0.408, 'y': 0.292, 'name': 'Sané'},
+                     {'x': 0.873, 'y': 0.163, 'name': 'Lewandowski'},
+                     {'x': 0.352, 'y': 0.346, 'name': 'Coman'},
+                     {'x': 0.676, 'y': 0.132, 'name': 'Núñez'},
+                     {'x': 0.714, 'y': 0.425, 'name': 'Messi'},
+                     {'x': 0.441, 'y': 0.269, 'name': 'Nkunku'},
+                     {'x': 0.056, 'y': 0.377, 'name': 'Raum'},
+                     {'x': 0.323, 'y': 0.343, 'name': 'Rodríguez'},
+                     {'x': 0.116, 'y': 0.337, 'name': 'Kimmich'},
+                     {'x': 0.541, 'y': 0.348, 'name': 'Gnabry'},
+                     {'x': 0.697, 'y': 0.125, 'name': 'Bakambu'},
+                     {'x': 0.574, 'y': 0.212, 'name': 'Muriel'},
+                     {'x': 0.388, 'y': 0.278, 'name': 'Mahrez'}]
