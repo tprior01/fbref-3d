@@ -411,9 +411,9 @@ def process_outliers(df_annotation, annotations, df, per_pixel, limits, dim):
 
     add_x_data = []
     add_y_data = []
-    vshift = 5 * y_per_pixel
+    vshift = round(5 * y_per_pixel, 3)
     for point in labels_intersection:
-        add_x_data.extend([point[0], point[0] + font.getlength(point[2]) * x_per_pixel])
+        add_x_data.extend([point[0], round(point[0] + font.getlength(point[2]) * x_per_pixel, 3)])
         add_y_data.extend([point[1] + vshift, point[1] - vshift])
     x_scatter = [player['x'] for player in df]
     y_scatter = [player['y'] for player in df]
