@@ -224,11 +224,11 @@ def get_annotation_data(
                 x_coord, y_coord, w, h, x[ind], y[ind]
             )
             if x_near is not None:
-                lines.add((x[ind], y[ind], x_near, y_near))
+                lines.add((round(x[ind], 3), round(y[ind], 3), round(x_near, 3), round(y_near, 3)))
 
     annotations = set()
     for x_coord, y_coord, width, height, string, ind in non_overlapping_boxes:
-        annotations.add((x_coord, y_coord, string, width, height))
+        annotations.add((round(x_coord, 3), round(y_coord, 3), string, round(width, 3), round(height, 3)))
     return annotations, lines
 
 
