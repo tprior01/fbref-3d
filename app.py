@@ -4,16 +4,24 @@ from dash_bootstrap_components import Col, Row, Card, themes
 from dash.dependencies import Input, Output, State
 from plotly.graph_objs import Figure
 from plotly.express import scatter_3d, scatter
-from maps import intial_label_data, cat_options, axis_options, season_map, comp_map, position_list, not_per_min, aggregates, combined
+from maps import cat_options, axis_options, season_map, comp_map, position_list, not_per_min, aggregates, combined
 from pandas import read_sql, DataFrame
 from os import environ
 from sqlalchemy import text, create_engine, select, MetaData, func, extract, Integer, true, false, cast, or_, and_
-from textalloc import get_annotation_data
+from textalloc import allocate_text
 from sklearn.ensemble import IsolationForest
 from numpy import vectorize
 from ast import literal_eval
 from PIL import ImageFont
-from itertools import starmap
+from dotenv import load_dotenv
+
+load_dotenv()
+
+"""
+Callbacks take this form:
+
+widgets -> dataframe -> graph -> limits -> screen width -> x/y per pixel -> outliers -> annotations 
+"""
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
 
@@ -30,7 +38,8 @@ with engine.connect() as conn:
     max_mins = conn.execute(
         text("select max(sum) from (select id, sum(minutes) from playingtime group by (id)) as x")).scalar()
     max_value, max_age = conn.execute(
-        text("select ceiling(max(current_value))::Integer,max(date_part('year',age(dob)))::Integer from player")).all()[0]
+        text("select ceiling(max(current_value))::Integer,max(date_part('year',age(dob)))::Integer from player")).all()[
+        0]
     clubs = conn.execute(
         text("select distinct club from player where current_value > 20.0 order by club")).scalars().all()
     nations = conn.execute(
@@ -46,8 +55,7 @@ app.layout = Col([
                                    [-0.02614906698770315,0.45114906698770313]]''')], style={'display': 'none'}),
     dcc.Store(id='dataframe'),
     dcc.Store(id='per-pixel'),
-    dcc.Store(id='label-dataframe', data=intial_label_data),
-    dcc.Store(id='labels'),
+    dcc.Store(id='label-dataframe'),
     dcc.Markdown('''
         # FBREF-3D
     
@@ -85,11 +93,16 @@ app.layout = Col([
             Col(Row(html.Label('no.'), justify='center'), width=1)
         ]),
         Row([
-            Col(Row(radio_item(id="dimension", options={"2D": True, "3D": False}, value=True), justify='center'), width=3),
-            Col(Row(radio_item(id="colour", options={"Z-Axis": "z", "Position": "position"}, value="z"), justify='center'), width=3),
-            Col(Row(radio_item(id="per_min", options={"Per 90": True, "Total": False}, value=True), justify='center'), width=3),
-            Col(Row(radio_item(id="annotation", options={"outliers": True, "none": False}, value=True), justify='center'), width=2),
-            Col(Row(dcc.Input(id='outliers', type='number', value=25, size='2', max=50, min=0, step=1), justify='center'), width=1)
+            Col(Row(radio_item(id="dimension", options={"2D": True, "3D": False}, value=True), justify='center'),
+                width=3),
+            Col(Row(radio_item(id="colour", options={"Z-Axis": "z", "Position": "position"}, value="z"),
+                    justify='center'), width=3),
+            Col(Row(radio_item(id="per_min", options={"Per 90": True, "Total": False}, value=True), justify='center'),
+                width=3),
+            Col(Row(radio_item(id="annotation", options={"outliers": True, "none": False}, value=True),
+                    justify='center'), width=2),
+            Col(Row(dcc.Input(id='outliers', type='number', value=25, size='2', max=50, min=0, step=1),
+                    justify='center'), width=1)
         ]),
     ], style={"width": "100%"}, body=True),
     Card([
@@ -142,24 +155,30 @@ app.layout = Col([
 
 app.clientside_callback(
     """
-    function(dataframe) {
-        var w = window.innerWidth;
-        return w;
+    function(dataframe, dim) {
+        if (!dim) {
+            return window.dash_clientside.no_update
+        } else {
+            var w = window.innerWidth;
+            return w;
+        }
     }
     """,
     Output('x-pixels', 'children'),
-    Input('limits', 'children')
+    Input('limits', 'children'),
+    State('dimension', 'value'),
+
 )
 
 app.clientside_callback(
     """
     function(fig, dim) {
         if (!dim) {
-                return window.dash_clientside.no_update
+            return window.dash_clientside.no_update
         } else {
-                const x_range = fig.layout.xaxis.range;
-                const y_range = fig.layout.yaxis.range;
-                return JSON.stringify([x_range, y_range])
+            const x_range = fig.layout.xaxis.range;
+            const y_range = fig.layout.yaxis.range;
+            return JSON.stringify([x_range, y_range])
         }
     }
     """,
@@ -190,14 +209,14 @@ def xy_per_pixel(x_pixels, limits):
     Output('dataframe', 'data', allow_duplicate=True),
     inputs=[
         (
-            Input('x', 'value'),
-            Input('y', 'value'),
-            Input('z', 'value'),
+                Input('x', 'value'),
+                Input('y', 'value'),
+                Input('z', 'value'),
         ),
         (
-            Input('xcat', 'value'),
-            Input('ycat', 'value'),
-            Input('zcat', 'value'),
+                Input('xcat', 'value'),
+                Input('ycat', 'value'),
+                Input('zcat', 'value'),
         ),
         Input('club', 'value'),
         Input('nation', 'value'),
@@ -208,94 +227,43 @@ def xy_per_pixel(x_pixels, limits):
         Input('competitions', 'value'),
         Input('positions', 'value'),
         Input('per_min', 'value'),
-        Input('outliers', 'value'),
-        State('names', 'value'),
-        Input('annotation', 'value')
+        Input('names', 'value'),
     ],
     prevent_initial_call=True
 )
-def get_dataframe(xyz, xyz_cats, club, nation, ages, values, mins, seasons, comps, positions, per_min, outliers, names, annotation):
+def get_dataframe(xyz, xyz_cats, club, nation, ages, values, mins, seasons, comps, positions, per_min, names):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
-    query = make_query(xyz, xyz_cats, club, nation, ages, values, mins, seasons, comps, positions, names, per_min)
+    query = make_query(xyz, xyz_cats, club, nation, ages, values, mins, seasons, comps, positions, per_min, names)
     with engine.connect() as conn:
         df = read_sql(query, con=conn).round({'x': 3, 'y': 3, 'z': 3}).fillna(0)
         conn.close()
-    if not annotation:
-        df["iso_forest_outliers"] = 1
-    else:
-        l = len(df.index)
-        isf = IsolationForest(n_estimators=100, random_state=42, contamination=0.5 if outliers / l > 0.5 else outliers / l)
-        preds = isf.fit_predict(df[['x', 'y']])
-        df["iso_forest_outliers"] = preds
     return df.to_dict('records')
-
-
-@app.callback(
-    Output('dataframe', 'data', allow_duplicate=True),
-    inputs=[
-        Input('names', 'value'),
-        State('dataframe', 'data'),
-        (
-            (
-                State('x', 'value'),
-                State('y', 'value'),
-                State('z', 'value'),
-            ),
-            (
-                State('xcat', 'value'),
-                State('ycat', 'value'),
-                State('zcat', 'value'),
-            ),
-            State('club', 'value'),
-            State('nation', 'value'),
-            State('ages', 'value'),
-            State('values', 'value'),
-            State('minutes', 'value'),
-            State('seasons', 'value'),
-            State('competitions', 'value'),
-            State('positions', 'value'),
-            State('per_min', 'value'),
-            State('outliers', 'value'),
-        )
-    ],
-    prevent_initial_call=True
-)
-def update_dataframe_with_name(names, df, query_params):
-    """Checks if a player is in the stored data, and if not, makes a new query which includes the new player"""
-    if len(names) == 0:
-        return no_update
-    df = DataFrame(df)
-    name = names[-1]
-    if name in df['name'].values:
-        return no_update
-    else:
-        get_dataframe(*query_params, names)
 
 
 @app.callback(
     Output('main-plot', 'figure', allow_duplicate=True),
     inputs=[
         (
-            State('x', 'value'),
-            State('y', 'value'),
-            State('z', 'value'),
-            State('x', 'options'),
-            State('y', 'options'),
-            State('z', 'options'),
+                State('x', 'value'),
+                State('y', 'value'),
+                State('z', 'value'),
+                State('x', 'options'),
+                State('y', 'options'),
+                State('z', 'options'),
         ),
         Input('dataframe', 'data'),
         Input('dimension', 'value'),
         State('per_min', 'value'),
         Input('colour', 'value'),
+        Input('annotation', 'value')
     ],
     prevent_initial_call=True
 )
-def get_figure(xyz, data, dim, per_min, colour):
+def get_figure(xyz, data, dim, per_min, colour, annotation):
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     x_label = [x['label'] for x in xyz[3] if x['value'] == xyz[0]][0]
     y_label = [x['label'] for x in xyz[4] if x['value'] == xyz[1]][0]
     z_label = [x['label'] for x in xyz[5] if x['value'] == xyz[2]][0]
-
     df = DataFrame(data)
     graph_params = dict(
         data_frame=df,
@@ -338,150 +306,86 @@ def get_figure(xyz, data, dim, per_min, colour):
     fig.update_traces(
         marker_size=5,
     )
-    fig.update_scenes(
-        aspectratio=dict(x=1, y=1, z=1),
-        aspectmode="auto"
-    )
     fig.update_coloraxes(
         colorbar_title=dict(
             side='right'
         )
     )
+    if not dim:
+        fig.update_scenes(
+            aspectratio=dict(x=1, y=1, z=1),
+            aspectmode="auto"
+        )
     return fig
 
 
 @app.callback(
-    Output('label-dataframe', 'data'),
-    Input('dataframe', 'data'),
+    Output('label-dataframe', 'data', allow_duplicate=True),
+    State('dataframe', 'data'),
     Input('add-only', 'value'),
-    Input('annotation', 'value'),
-    Input('names', 'value'),
+    State('annotation', 'value'),
+    State('names', 'value'),
     Input('per-pixel', 'data'),
+    Input('outliers', 'value'),
     prevent_initial_call=True
 )
-def get_outliers(df, add, annotation, names, per_pixel):
+def get_outliers(df, add, annotation, names, per_pixel, outliers):
     """Stores the outliers as a separate dataframe"""
-    if not annotation or per_pixel is None or df is None:
+    if df is None:
         return no_update
     df = DataFrame(df)
+    if not annotation:
+        df["ifo"] = 1
+    else:
+        l = len(df.index)
+        isf = IsolationForest(n_estimators=100, random_state=42, contamination=0.5 if outliers / l > 0.5 else outliers / l)
+        preds = isf.fit_predict(df[['x', 'y']].to_numpy())
+        df["ifo"] = preds
     l = len(df.index)
-    if l > 50:
-        if add:
-            df = df[(df["iso_forest_outliers"] == -1) | df['name'].isin(names)][["x", "y", "name"]]
-        else:
-            df = df[df["iso_forest_outliers"] == -1][["x", "y", "name"]]
+    if l < 50:
+        df = df[["x", "y", "name"]]
+    elif add and annotation:
+        df = df[(df["ifo"] == -1) | df['name'].isin(names)][["x", "y", "name"]]
+    elif not add and annotation:
+        df = df[df["ifo"] == -1][["x", "y", "name"]]
+    else:
+        df = DataFrame()
     if len(df.index) > 0:
         df['name'] = vectorize(lambda x: x.split(' ')[-1])(df['name'])
     return df.to_dict('records')
 
 
 @app.callback(
-    Output('labels', 'data'),
+    Output('main-plot', 'figure', allow_duplicate=True),
     Input('label-dataframe', 'data'),
-    State('labels', 'data'),
     State('dataframe', 'data'),
     State('per-pixel', 'data'),
     State('limits', 'children'),
-    Input('dimension', 'value'),
+    State('dimension', 'value'),
+    State('main-plot', 'figure'),
     prevent_initial_call=True
 )
-def process_outliers(df_annotation, annotations, df, per_pixel, limits, dim):
+def add_annotation(df_annotation, df, per_pixel, limits, dim, fig):
     """Finds non-overlapping positions only for newly added players"""
-    if per_pixel is None or df is None or not dim:
+    if not dim:
         return no_update
-    if annotations is None:
-        old_labels, old_arrows = {}, {}
-    else:
-        old_labels = set(starmap(list_to_tuple, annotations[0]))
-        old_arrows = set(starmap(list_to_tuple, annotations[1]))
-    x_per_pixel, y_per_pixel = per_pixel[0], per_pixel[1]
+    fig['layout'].update(annotations=[])
+    fig = Figure(fig)
     limits = literal_eval(limits)
-    df_annotation = DataFrame(df_annotation)
-    new_labels = set()
-    new_arrows = set()
-    for row in df_annotation.itertuples(index=False):
-        x = getattr(row, 'x')
-        y = getattr(row, 'y')
-        string = getattr(row, 'name')
-        width = x + font.getlength(string)
-        new_labels.add((x, y, string, width, 12))
-        new_arrows.add((x, y))
-    labels_intersection = new_labels.intersection(old_labels)
-    labels_difference = new_labels.difference(old_labels)
-
-    add_x_data = []
-    add_y_data = []
-    vshift = round(5 * y_per_pixel, 3)
-    for point in labels_intersection:
-        add_x_data.extend([point[0], round(point[0] + font.getlength(point[2]) * x_per_pixel, 3)])
-        add_y_data.extend([point[1] + vshift, point[1] - vshift])
-    x_scatter = [player['x'] for player in df]
-    y_scatter = [player['y'] for player in df]
-    x_scatter.extend(add_x_data)
-    y_scatter.extend(add_y_data)
-
-    label_data, arrow_data = get_annotation_data(
-        x=[player[0] for player in labels_difference],
-        y=[player[1] for player in labels_difference],
-        text_list=[player[2] for player in labels_difference],
+    allocate_text(
+        x=[player['x'] for player in df_annotation],
+        y=[player['y'] for player in df_annotation],
+        text_list=[player['name'] for player in df_annotation],
+        fig=fig,
         x_lims=limits[0],
         y_lims=limits[1],
         x_per_pixel=per_pixel[0],
         y_per_pixel=per_pixel[1],
         font=font,
-        x_scatter=x_scatter,
-        y_scatter=y_scatter
+        x_scatter=[player['x'] for player in df],
+        y_scatter=[player['y'] for player in df],
     )
-    new_arrow_coords = {(arrow[0], arrow[1]) for arrow in arrow_data}
-    arrows_intersection = {arrow for arrow in old_arrows if (arrow[0], arrow[1]) in new_arrows and (arrow[0], arrow[1]) not in new_arrow_coords}
-    return [list(label_data.union(labels_intersection)), list(arrow_data.union(arrows_intersection))]
-
-
-@app.callback(
-    Output('main-plot', 'figure', allow_duplicate=True),
-    State('main-plot', 'figure'),
-    State('per-pixel', 'data'),
-    Input('labels', 'data'),
-    State('dimension', 'value'),
-    prevent_initial_call=True
-)
-def add_annotations(fig, per_pixel, annotations, dim):
-    if not dim:
-        return no_update
-    fig = Figure(fig)
-    labels, arrows = annotations[0], annotations[1]
-    for label in labels:
-        fig.add_annotation(
-            dict(
-                x=label[0],
-                y=label[1],
-                showarrow=False,
-                text=label[2],
-                font=dict(size=10),
-                xshift=label[3] / (2 * per_pixel[0]),
-                yshift=label[4] / (2 * per_pixel[1]),
-            )
-        )
-    for arrow in arrows:
-        fig.add_annotation(
-            dict(
-                x=arrow[0],
-                y=arrow[1],
-                ax=arrow[2],
-                ay=arrow[3],
-                showarrow=True,
-                arrowcolor='grey',
-                text="",
-                axref='x',
-                ayref='y'
-
-            )
-        )
     return fig
-
-
-def list_to_tuple(*args):
-    return tuple(args)
 
 
 def select_clause(sub, table):
@@ -589,7 +493,7 @@ def mins_sub_query(seasons, comps):
     return query
 
 
-def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, names, per_min):
+def make_query(xyz, xyz_cats, club, nationality, ages, values, minutes, seasons, comps, positions, per_min, names):
     player = player_sub_query(club, nationality, values, positions, names)
     x = data_sub_query(xyz[0], xyz_cats[0], seasons, comps, 'x')
     y = data_sub_query(xyz[1], xyz_cats[1], seasons, comps, 'y')
