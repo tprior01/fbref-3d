@@ -35,8 +35,7 @@ with engine.connect() as conn:
     max_mins = conn.execute(
         text("select max(sum) from (select id, sum(minutes) from playingtime group by (id)) as x")).scalar()
     max_value, max_age = conn.execute(
-        text("select ceiling(max(current_value))::Integer,max(date_part('year',age(dob)))::Integer from player")).all()[
-        0]
+        text("select ceiling(max(current_value))::Integer,max(date_part('year',age(dob)))::Integer from player")).all()[0]
     clubs = conn.execute(
         text("select distinct club from player where current_value > 20.0 order by club")).scalars().all()
     nations = conn.execute(
@@ -48,8 +47,7 @@ with engine.connect() as conn:
 app.layout = Col([
     html.Div([html.Div(id='x-pixels')], style={'display': 'none'}),
     html.Div([html.Div(id='limits',
-                       children='''[[-0.06434213122841637,1.0953421312284162],
-                                   [-0.02614906698770315,0.45114906698770313]]''')], style={'display': 'none'}),
+                       children='[[-0.0643421312,1.095342131],[-0.0261490669,0.4511490669]]')], style={'display': 'none'}),
     dcc.Store(id='dataframe'),
     dcc.Store(id='per-pixel'),
     dcc.Store(id='label-dataframe'),
@@ -57,8 +55,7 @@ app.layout = Col([
         # FBREF-3D
     
         A dashboard to visualise the data on fbref.com as 2D or 3D scatter graphs. The data is periodically scraped and 
-        added to a PostgreSQL database. Outliers are annotated and automatically adjusted to avoid overlapping. Find me 
-        on linkedin [here](https://www.linkedin.com/in/thomas-c-prior/).
+        added to a PostgreSQL database. Outliers are annotated and automatically adjusted to avoid overlapping.
         '''),
     Card([
         Row([
@@ -193,7 +190,7 @@ app.clientside_callback(
     prevent_initial_call=True
 )
 def xy_per_pixel(x_pixels, limits):
-    """Calculates the x and y range per pixel. The no. of pixels on the dynamic x-axis is linearly interpolated."""
+    """Calculates the x and y range per pixel. The pixel count of the dynamic x-axis is linearly interpolated."""
     limits = literal_eval(limits)
     x_lims, y_lims = limits[0], limits[1]
     x_pixels = round(x_pixels - (53 + 93 + (121 - 93) * (x_pixels - 450) / (1920 - 450)))
@@ -229,6 +226,7 @@ def xy_per_pixel(x_pixels, limits):
     prevent_initial_call=True
 )
 def get_dataframe(xyz, xyz_cats, club, nation, ages, values, mins, seasons, comps, positions, per_min, names):
+    """Queries the database and returns a dataframe"""
     per_min = [bool(per_min and str(axis) not in not_per_min) for axis in tuple(xyz)]
     query = make_query(xyz, xyz_cats, club, nation, ages, values, mins, seasons, comps, positions, per_min, names)
     with engine.connect() as conn:
