@@ -21,7 +21,7 @@ def allocate_text(
         y_scatter: Union[np.ndarray, List[float]] = None,
         text_size: int = 10,
         margin: float = 0.00,
-        min_distance: float = 0.0025,
+        min_distance: float = 0.0075,
         max_distance: float = 0.07,
         draw_lines: bool = True,
         linecolor: str = "grey",
