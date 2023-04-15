@@ -13,9 +13,6 @@ from sklearn.ensemble import IsolationForest
 from numpy import vectorize
 from ast import literal_eval
 from PIL import ImageFont
-from dotenv import load_dotenv
-
-load_dotenv()
 
 """
 Callbacks take this form:
