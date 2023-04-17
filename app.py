@@ -15,9 +15,14 @@ from ast import literal_eval
 from PIL import ImageFont
 
 """
-Callbacks take this form:
+The callbacks follow this pattern:
 
-widgets -> dataframe -> graph -> limits -> screen width -> x/y per pixel -> outliers -> annotations 
+dataframe -> graph -> limits -> screen width -> x/y per pixel -> outliers -> annotations 
+
+This is so the text box coordinates can be expressed in relation to the x and y range rather than in pixels. The graph 
+first needs to be plotted to get the limits. The screen width is needed to interpolate the pixels on the x-axis (as it
+is dynamically sized). The outliers are calculated as a subset of the dataframe. Then the annotations can be plotted 
+using code modified from https://github.com/ckjellson/textalloc. 
 """
 
 engine = create_engine(environ["SQLALCHEMY_DATABASE_URI"])
@@ -45,11 +50,11 @@ with engine.connect() as conn:
     conn.close()
 
 app.layout = Col([
-    html.Div([html.Div(id='x-pixels')], style={'display': 'none'}),
+    html.Div([html.Div(id='screen-width')], style={'display': 'none'}),
     html.Div([html.Div(id='limits',
                        children='[[-0.0643421312,1.095342131],[-0.0261490669,0.4511490669]]')], style={'display': 'none'}),
     dcc.Store(id='dataframe'),
-    dcc.Store(id='per-pixel'),
+    dcc.Store(id='xy-per-pixel'),
     dcc.Store(id='label-dataframe'),
     dcc.Markdown('''
         # FBREF-3D
@@ -89,9 +94,10 @@ app.layout = Col([
         Row([
             Col(Row(radio_item(id="dimension", options={"2D": True, "3D": False}, value=True), justify='center'),
                 width=3),
-            Col(Row(radio_item(id="colour", options={"Z-Axis": "z", "Position": "position"}, value="z"),
+            Col(Row(radio_item(id="marker-colours", options={"Z-Axis": "z", "Position": "position",
+                                                             "Club": "club", "Nationality": "nationality"}, value="z"),
                     justify='center'), width=3),
-            Col(Row(radio_item(id="per_min", options={"Per 90": True, "Total": False}, value=True), justify='center'),
+            Col(Row(radio_item(id="per-min", options={"Per 90": True, "Total": False}, value=True), justify='center'),
                 width=3),
             Col(Row(radio_item(id="annotation", options={"outliers": True, "none": False}, value=True),
                     justify='center'), width=2),
@@ -133,8 +139,9 @@ app.layout = Col([
             Col(html.Label('club')),
         ]),
         Row([
-            Col(drop_down("nation", ['All'] + nations, "All")),
-            Col(drop_down("club", ['All'] + clubs, "All")),
+            Col(dcc.Dropdown(id='nation', options=nations, value=[], multi=True)),
+            Col(dcc.Dropdown(id='club', options=clubs, value=[], multi=True)),
+
         ]),
     ], style={"width": "100%", "height": "50%"}, body=True),
     Card([
@@ -158,7 +165,7 @@ app.clientside_callback(
         }
     }
     """,
-    Output('x-pixels', 'children'),
+    Output('screen-width', 'children'),
     Input('limits', 'children'),
     State('dimension', 'value'),
 
@@ -184,8 +191,8 @@ app.clientside_callback(
 
 
 @app.callback(
-    Output('per-pixel', 'data'),
-    Input('x-pixels', 'children'),
+    Output('xy-per-pixel', 'data'),
+    Input('screen-width', 'children'),
     State('limits', 'children'),
     prevent_initial_call=True
 )
@@ -220,7 +227,7 @@ def xy_per_pixel(x_pixels, limits):
         Input('seasons', 'value'),
         Input('competitions', 'value'),
         Input('positions', 'value'),
-        Input('per_min', 'value'),
+        Input('per-min', 'value'),
         Input('names', 'value'),
     ],
     prevent_initial_call=True
@@ -248,8 +255,8 @@ def get_dataframe(xyz, xyz_cats, club, nation, ages, values, mins, seasons, comp
         ),
         Input('dataframe', 'data'),
         Input('dimension', 'value'),
-        State('per_min', 'value'),
-        Input('colour', 'value'),
+        State('per-min', 'value'),
+        Input('marker-colours', 'value'),
         Input('annotation', 'value')
     ],
     prevent_initial_call=True
@@ -320,7 +327,7 @@ def get_figure(xyz, data, dim, per_min, colour, annotation):
     Input('add-only', 'value'),
     State('annotation', 'value'),
     State('names', 'value'),
-    Input('per-pixel', 'data'),
+    Input('xy-per-pixel', 'data'),
     Input('outliers', 'value'),
     prevent_initial_call=True
 )
@@ -333,7 +340,7 @@ def get_outliers(df, add, annotation, names, per_pixel, outliers):
         df["ifo"] = 1
     else:
         l = len(df.index)
-        isf = IsolationForest(n_estimators=100, random_state=42, contamination=0.5 if outliers / l > 0.5 else outliers / l)
+        isf = IsolationForest(n_estimators=100, random_state=42, contamination=0.5 if outliers/l > 0.5 else outliers/l)
         preds = isf.fit_predict(df[['x', 'y']].to_numpy())
         df["ifo"] = preds
     l = len(df.index)
@@ -354,7 +361,7 @@ def get_outliers(df, add, annotation, names, per_pixel, outliers):
     Output('main-plot', 'figure', allow_duplicate=True),
     Input('label-dataframe', 'data'),
     State('dataframe', 'data'),
-    State('per-pixel', 'data'),
+    State('xy-per-pixel', 'data'),
     State('limits', 'children'),
     State('dimension', 'value'),
     State('main-plot', 'figure'),
@@ -463,8 +470,8 @@ def player_sub_query(club, nationality, values, positions, names):
     ).where(
         or_(
             and_(
-                (player.c["club"] == club if club != 'All' else true()),
-                (player.c["nationality"] == nationality if nationality != 'All' else true()),
+                (player.c['club'].in_(club) if club != [] else true()),
+                (player.c['nationality'].in_(nationality) if nationality != [] else true()),
                 (player.c["current_value"].between(values[0], values[1])),
                 (player.c["position"].in_(positions)),
             ),
