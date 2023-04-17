@@ -34,7 +34,8 @@ cat_options["Combined"] = "combined"
 app = Dash(external_stylesheets=[themes.BOOTSTRAP])
 server = app.server
 
-font = ImageFont.truetype('assets/fonts/arial.ttf', 10)
+text_size = 10
+font = ImageFont.truetype('assets/fonts/arial.ttf', text_size)
 
 with engine.connect() as conn:
     max_mins = conn.execute(
@@ -386,6 +387,7 @@ def add_annotation(df_annotation, df, per_pixel, limits, dim, fig):
         font=font,
         x_scatter=[player['x'] for player in df],
         y_scatter=[player['y'] for player in df],
+        text_size=text_size
     )
     return fig
 
