@@ -17,9 +17,9 @@ def allocate_text(
         x_per_pixel,
         y_per_pixel,
         font,
+        text_size,
         x_scatter: Union[np.ndarray, List[float]] = None,
         y_scatter: Union[np.ndarray, List[float]] = None,
-        text_size: int = 10,
         margin: float = 0.00,
         min_distance: float = 0.0075,
         max_distance: float = 0.07,
@@ -28,7 +28,7 @@ def allocate_text(
         draw_all: bool = True,
         nbr_candidates: int = 100,
 ):
-    """Main function of allocating text-boxes in matplotlib plot
+    """
     Args:
         x: a list of x coordinates for the labels.
         y: a list of y coordinates for the labels.
@@ -38,9 +38,11 @@ def allocate_text(
         y_lims: the y limits of the plot.
         x_per_pixel: the x range per pixel.
         y_per_pixel: the y range per pixel.
+        font (ImageFont): a pillow ImageFont object
+        text_size (int): size of text.
         x_scatter (Union[np.ndarray, List[float]], optional): x-coordinates of all scattered points in plot 1d array/list. Defaults to None.
         y_scatter (Union[np.ndarray, List[float]], optional): y-coordinates of all scattered points in plot 1d array/list. Defaults to None.
-        text_size (int, optional): size of text. Defaults to 10.
+        text_size (int): size of text.
         margin (float, optional): parameter for margins between objects. Increase for larger margins to points and lines. Defaults to 0.01.
         min_distance (float, optional): parameter for min distance between text and origin. Defaults to 0.015.
         max_distance (float, optional): parameter for max distance between text and origin. Defaults to 0.07.
@@ -88,17 +90,12 @@ def allocate_text(
         scatter_xy=scatterxy,
     )
 
-    lines = set()
-    annotations = set()
-
     if draw_lines:
         for x_coord, y_coord, w, h, s, ind in non_overlapping_boxes:
             x_near, y_near = find_nearest_point_on_box(
                 x_coord, y_coord, w, h, x[ind], y[ind]
             )
             if x_near is not None:
-                lines.add((x[ind], y[ind], x_near, y_near))
-
                 fig.add_annotation(
                     dict(
                         x=x[ind],
@@ -114,7 +111,6 @@ def allocate_text(
                     )
                 )
     for x_coord, y_coord, w, h, s, ind in non_overlapping_boxes:
-        annotations.add((x_coord, y_coord, s, w, h))
         fig.add_annotation(
             dict(
                 x=x_coord,
