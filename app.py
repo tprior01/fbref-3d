@@ -196,11 +196,13 @@ app.clientside_callback(
     State('limits', 'children'),
     prevent_initial_call=True
 )
-def xy_per_pixel(x_pixels, limits):
-    """Calculates the x and y range per pixel. The pixel count of the dynamic x-axis is linearly interpolated."""
+def xy_per_pixel(screen_width, limits):
+    """Calculates the x and y range per pixel. The y-range is a constant 700 pixels. The x-range automatically adjusts
+    with the screen width so needs to be calculated. For some reason the left margin is fixed (53 pixels) but the right
+    margin varies with the screen width so must be linearly interpolated (93+(121-93)*(screen_width-450)/(1920-450)."""
     limits = literal_eval(limits)
     x_lims, y_lims = limits[0], limits[1]
-    x_pixels = x_pixels - (53 + 93 + (121 - 93) * (x_pixels - 450) / (1920 - 450))
+    x_pixels = screen_width - (53 + 93 + (121 - 93) * (screen_width - 450) / (1920 - 450))
     x_per_pixel = (x_lims[1] - x_lims[0]) / x_pixels
     y_per_pixel = (y_lims[1] - y_lims[0]) / 700
     return [x_per_pixel, y_per_pixel]
