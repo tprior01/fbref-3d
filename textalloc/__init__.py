@@ -40,16 +40,16 @@ def allocate_text(
         y_per_pixel: the y range per pixel.
         font (ImageFont): a pillow ImageFont object
         text_size (int): size of text.
-        x_scatter (Union[np.ndarray, List[float]], optional): x-coordinates of all scattered points in plot 1d array/list. Defaults to None.
-        y_scatter (Union[np.ndarray, List[float]], optional): y-coordinates of all scattered points in plot 1d array/list. Defaults to None.
+        x_scatter (Union[np.ndarray, List[float]], optional): x-coords of all scattered points in plot 1d array/list.
+        y_scatter (Union[np.ndarray, List[float]], optional): y-coords of all scattered points in plot 1d array/list.
         text_size (int): size of text.
-        margin (float, optional): parameter for margins between objects. Increase for larger margins to points and lines. Defaults to 0.01.
-        min_distance (float, optional): parameter for min distance between text and origin. Defaults to 0.015.
-        max_distance (float, optional): parameter for max distance between text and origin. Defaults to 0.07.
-        draw_lines (bool, optional): draws lines from original points to textboxes. Defaults to True.
-        linecolor (str, optional): color code of the lines between points and text-boxes. Defaults to "r".
-        draw_all (bool, optional): Draws all texts after allocating as many as possible despit overlap. Defaults to True.
-        nbr_candidates (int, optional): Sets the number of candidates used. Defaults to 0.
+        margin (float, optional): parameter for margins between objects. Increase for larger margins to points and lines.
+        min_distance (float, optional): parameter for min distance between text and origin.
+        max_distance (float, optional): parameter for max distance between text and origin.
+        draw_lines (bool, optional): draws lines from original points to text-boxes.
+        linecolor (str, optional): color code of the lines between points and text-boxes.
+        draw_all (bool, optional): Draws all texts after allocating as many as possible despite overlap.
+        nbr_candidates (int, optional): Sets the number of candidates used.
     """
     # Ensure good inputs
     x = np.array(x)

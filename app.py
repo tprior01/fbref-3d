@@ -51,7 +51,7 @@ with engine.connect() as conn:
     conn.close()
 
 app.layout = Col([
-    html.Div(id='screen-width',style={'display': 'none'}),
+    html.Div(id='screen-width', style={'display': 'none'}),
     html.Div(id='limits',
              children='[[-0.0643421312,1.095342131],[-0.0261490669,0.4511490669]]', style={'display': 'none'}),
     dcc.Store(id='dataframe'),
