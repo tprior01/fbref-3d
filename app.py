@@ -21,7 +21,7 @@ dataframe -> graph -> limits -> screen width -> x/y per pixel -> outliers -> ann
 
 This is so the text box coordinates can be expressed in relation to the x and y range rather than in pixels. The graph 
 first needs to be plotted to get the limits. The screen width is needed to interpolate the pixels on the x-axis (as it
-is dynamically sized). The outliers are calculated as a subset of the dataframe. Then the annotations can be plotted 
+is dynamically sized in relation to the screen width). The outliers are calculated. Then the annotations can be plotted 
 using code modified from https://github.com/ckjellson/textalloc. 
 """
 
@@ -51,9 +51,9 @@ with engine.connect() as conn:
     conn.close()
 
 app.layout = Col([
-    html.Div([html.Div(id='screen-width')], style={'display': 'none'}),
-    html.Div([html.Div(id='limits',
-                       children='[[-0.0643421312,1.095342131],[-0.0261490669,0.4511490669]]')], style={'display': 'none'}),
+    html.Div(id='screen-width',style={'display': 'none'}),
+    html.Div(id='limits',
+             children='[[-0.0643421312,1.095342131],[-0.0261490669,0.4511490669]]', style={'display': 'none'}),
     dcc.Store(id='dataframe'),
     dcc.Store(id='xy-per-pixel'),
     dcc.Store(id='label-dataframe'),
@@ -169,7 +169,6 @@ app.clientside_callback(
     Output('screen-width', 'children'),
     Input('limits', 'children'),
     State('dimension', 'value'),
-
 )
 
 app.clientside_callback(
