@@ -368,7 +368,7 @@ def get_outliers(df, add, annotation, names, per_pixel, outliers):
     prevent_initial_call=True
 )
 def add_annotation(df_annotation, df, per_pixel, limits, dim, fig):
-    """Finds non-overlapping positions only for newly added players"""
+    """Adds annotations to plot"""
     if not dim:
         return no_update
     fig['layout'].update(annotations=[])
