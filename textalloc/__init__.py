@@ -38,7 +38,7 @@ def allocate_text(
         y_lims: the y limits of the plot.
         x_per_pixel: the x range per pixel.
         y_per_pixel: the y range per pixel.
-        font (ImageFont): a pillow ImageFont object
+        font (_type_): a pillow ImageFont object
         text_size (int): size of text.
         x_scatter (Union[np.ndarray, List[float]], optional): x-coords of all scattered points in plot 1d array/list.
         y_scatter (Union[np.ndarray, List[float]], optional): y-coords of all scattered points in plot 1d array/list.
